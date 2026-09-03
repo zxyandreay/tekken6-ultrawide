@@ -6,6 +6,7 @@ on:
     paths:
       - 'plugin/**'
       - 'tools/trace_hud_candidates.py'
+      - 'tools/trace_v05_candidates.py'
       - 'docs/PLUGIN_TEST.md'
       - 'docs/STATUS.md'
       - 'README.md'
@@ -36,12 +37,15 @@ jobs:
           python tools/trace_hud_candidates.py \
             --eboot ULUS10466_EBOOT.BIN \
             --output diagnostics-ci/HUD_TRACE.md
+          python tools/trace_v05_candidates.py \
+            --eboot ULUS10466_EBOOT.BIN \
+            --output diagnostics-ci/V05_TRACE.md
 
       - name: Upload analysis trace
         uses: actions/upload-artifact@v4
         with:
           name: Tekken6-HUD-camera-trace
-          path: diagnostics-ci/HUD_TRACE.md
+          path: diagnostics-ci/*.md
           if-no-files-found: error
 
   build:
