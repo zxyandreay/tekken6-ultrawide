@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Trace Tekken 6's likely common native-PSP 2D presentation paths.
 
-This is intentionally analysis-only.  The goal is to distinguish the live
+This is intentionally analysis-only. The goal is to distinguish the live
 screen-space/sprite transform used by visible HUD/menu rendering from the
 already disproven generic 480x272 orthographic paths.
 """
@@ -19,14 +19,17 @@ SEG_VADDR = 0x08804018
 SEG_SIZE = 0x003F62A8
 
 TARGETS = {
-    0x08AC5BA8: "distinct screen-space / sprite-transform candidate",
+    0x08946390: "480x272 setup family feeding the alternate transform",
+    0x08AC5BA8: "thin wrapper / trampoline candidate",
+    0x08AC63AC: "forwarded six-float transform behind 0x08AC5BA8",
     0x08ACA990: "known generic orthographic builder (negative control)",
     0x08ACAB14: "matrix-combine helper used by known ortho paths",
 }
 
 FOCUS_RANGES = [
-    (0x08946390, 0x0894650C, "viewport/surface family that calls 0x08AC5BA8"),
-    (0x08AC5BA8, 0x08AC5D80, "0x08AC5BA8 candidate body"),
+    (0x08946390, 0x0894650C, "480x272 setup family that calls 0x08AC5BA8"),
+    (0x08AC5B8C, 0x08AC5C00, "wrapper cluster around 0x08AC5BA8"),
+    (0x08AC6380, 0x08AC65C0, "forwarded transform at 0x08AC63AC"),
     (0x08AA62D8, 0x08AA655C, "high-ranked 2D widget/render family"),
 ]
 
@@ -143,8 +146,8 @@ def target_report(md: Cs, data: bytes, target: int, label: str) -> list[str]:
         "- function PSP-screen constants: " + ("; ".join(screen_constant_notes(data, fn_start, fn_end)) or "none"),
         "",
     ]
-    body_start = max(fn_start, target - 0x40)
-    body_end = min(fn_end, target + 0x1D8)
+    body_start = max(SEG_VADDR, target - 0x40)
+    body_end = min(SEG_VADDR + SEG_SIZE, target + 0x220)
     lines += disasm_range(md, data, body_start, body_end, {target})
     lines.append("")
     for callsite in callers:
