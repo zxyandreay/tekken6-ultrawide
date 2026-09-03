@@ -21,7 +21,8 @@ SEG_SIZE = 0x003F62A8
 
 HUD_RANGES = [
     (0x08AA62D8, 0x08AA655C, "HUD candidate #1"),
-    (0x08A3916C, 0x08A396D8, "HUD candidate #2"),
+    (0x08A39140, 0x08A396D8, "HUD candidate #2 descriptor family"),
+    (0x08A39740, 0x08A39A20, "HUD candidate #2 follow-up render helpers"),
 ]
 CALLER_RANGES = [
     (0x08A27FC0, 0x08A28100, "caller of candidate #2 batch/setup"),
@@ -36,10 +37,11 @@ HELPER_RANGES = [
 ]
 ENTRY_TARGETS = [
     (0x08AA62D8, "candidate #1 entry"),
-    (0x08A3916C, "candidate #2 scale/set entry"),
+    (0x08A39158, "candidate #2 coordinate/set entry"),
     (0x08A39284, "candidate #2 initializer A"),
     (0x08A392F0, "candidate #2 initializer B"),
     (0x08A3935C, "candidate #2 batch/setup entry"),
+    (0x08A39808, "candidate #2 follow-up float/property setter"),
 ]
 CAMERA_SITE = 0x0895350C
 CAMERA_VALUES = {
@@ -179,7 +181,7 @@ def field_4c_report(data: bytes) -> list[str]:
     for off in range(SEG_FILE, end - 3, 4):
         word = struct.unpack_from("<I", data, off)[0]
         opcode = word >> 26
-        if opcode in (0x31, 0x39) and (word & 0xFFFF) == 0x004C:  # lwc1/swc1 +0x4c(base)
+        if opcode in (0x31, 0x39) and (word & 0xFFFF) == 0x004C:
             hits.append(offset_to_runtime(off))
     lines = ["## Global COP1 uses of structure offset `+0x4C`", "", f"Found {len(hits)} lwc1/swc1 hits.", ""]
     for hit in hits:
