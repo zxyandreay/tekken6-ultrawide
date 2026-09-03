@@ -4,7 +4,7 @@ Last updated: 2026-09-03
 
 ## Current Phase
 
-Phase 5: classify Tekken 6's 2D/HUD orthographic projection paths before implementing a runtime plugin HUD fix.
+Phase 5B: the first isolated orthographic-path hypothesis has been tested and rejected for the visible HUD/UI/menus. Research now pivots to the live screen-space/sprite coordinate path.
 
 ## Completed
 
@@ -22,33 +22,53 @@ Phase 5: classify Tekken 6's 2D/HUD orthographic projection paths before impleme
 - Identified generic orthographic projection builder `0x08ACA990`.
 - Identified exactly three direct 480x272 orthographic setup paths at calls `0x08863258`, `0x088634E4`, and `0x088644B8`.
 - Verified right-X `480.0` loads at `0x08863230`, `0x088634A0`, and `0x08864494`.
-- Added `tools/analyze_projection_paths.py` to reproduce projection-call scanning without Capstone.
-- Added `diagnostics/ULUS10466_ORTHO_PATH_TEST.ini` for isolated one-path-at-a-time PPSSPP classification.
-- Documented why the earlier centered `[-60, 540]` global 2D experiment could mathematically preserve ordinary HUD proportions yet break full-screen overlays: a 0..480 overlay no longer covers a 600-wide logical projection.
-- Rejected the previous `0x08864B74` path as a first-line orthographic HUD target because it calls `0x08AC5BA8`, not `0x08ACA990`.
+- Added `tools/analyze_projection_paths.py` and isolated diagnostic INI.
+- User tested Path A, B, and C independently on the POCO F5 with 20:9 + Stretch.
+- **All three A/B/C tests produced no visible change in HUD/UI/menus.**
+- Recorded A/B/C as a reproducible negative result rather than continuing blind ortho experiments.
+- Added `tools/find_screen_space_candidates.py` to scan for broader PSP logical-coordinate code around 480/272, centers, and 512x320-style virtual dimensions.
+- Kept `0x08864B74 -> 0x08AC5BA8` out of the first ortho solution but promoted the distinct `0x08AC5BA8` family for renewed static analysis now that A/B/C did not affect visible UI.
 
 ## Current Blocker
 
-Static analysis cannot reliably tell which visible screen groups use orthographic paths A, B, and C. The next high-value step is user-side PPSSPP testing of the isolated diagnostics to classify battle HUD, menus, pause overlays/fades, and other 2D groups.
+The repository's EBOOT can be analyzed locally, but the next useful ranking of live screen-space candidates requires running the new scanner against the decrypted EBOOT and inspecting its report.
+
+The primary open question is now whether Tekken's visible HUD uses:
+
+- pre-transformed/sprite vertices,
+- a separate matrix family such as `0x08AC5BA8`,
+- a screen-coordinate conversion helper,
+- or a transform applied after the three generic orthographic setup paths.
 
 ## Current Experimental Status
 
-No PRX plugin patch is active yet. The repository now contains a deliberately minimal diagnostic INI. Each diagnostic changes only one right-X bound from `480.0` to `600.0`; it is designed to make the affected 2D group obviously narrower/left-aligned under Stretch so its ownership can be identified without broad sprite hooks.
+The A/B/C diagnostic has completed its purpose and should not be repeated unless a newly identified screen points back to one of those paths.
 
-This diagnostic is not intended for normal play and is not a final HUD correction.
+No PRX plugin HUD patch is active yet. The safe baseline remains the working 20:9 3D CWCheat only.
 
 ## Last Known-Good Behavior
 
 `ULUS10466.ini` remains the safe baseline: working 20:9 3D correction only, with HUD/UI still stretched when PPSSPP Display Layout is set to Stretch.
 
-Do not replace or weaken that baseline while diagnostic work continues.
+Do not replace or weaken that baseline while HUD research continues.
 
 ## Latest Build Status
 
-No plugin source or PRX build output exists yet. Plugin implementation should wait until the three orthographic paths are visually classified well enough to separate ordinary HUD from full-screen overlays.
+No plugin source or PRX build output exists yet. This remains intentional; user testing disproved the first orthographic ownership hypothesis, so building a hook around those call sites now would encode the wrong abstraction.
+
+## Next Required Local Analysis
+
+After syncing the repository, run:
+
+```bash
+python -m pip install -r requirements.txt
+python tools/find_screen_space_candidates.py --output diagnostics/SCREEN_SPACE_CANDIDATES.md
+```
+
+Then review/commit the generated report so the next analysis pass can rank candidate live HUD/sprite paths without guessing.
 
 ## User Validation Still Required
 
-The user should test `diagnostics/ULUS10466_ORTHO_PATH_TEST.ini` on the POCO F5 with PPSSPP Stretch, enabling only one of Path A/B/C at a time. Record which visible elements change on title/menu, character select, gameplay HUD, pause overlay, and results screens.
+No further A/B/C visual testing is required now. Future user-side diagnostics should only be created after static analysis identifies a stronger live 2D/screen-space candidate.
 
-All final visual behavior must be validated in PPSSPP; static analysis alone is not proof of correctness.
+All final visual behavior must still be validated in PPSSPP; static analysis alone is not proof of correctness.
