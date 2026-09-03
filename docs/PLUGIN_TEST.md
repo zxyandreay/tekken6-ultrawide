@@ -56,13 +56,13 @@ The manifest is restricted to USA Tekken 6 `ULUS10466`.
 
 1. Disable the existing Tekken 6 20:9 CWCheat. The plugin should be the only aspect patch during the test.
 2. Keep PPSSPP Display Layout set to `Stretch`, matching the previous verified test setup.
-3. Start with the supplied configuration:
+3. The supplied package starts safely with HUD correction disabled:
 
 ```ini
 [MAIN]
 ForceAspectRatio = 20:9
 Enable3D = 1
-HUDMode = 1
+HUDMode = 0
 HUDVirtualWidth = 600
 DebugLogging = 1
 ```
@@ -73,7 +73,7 @@ DebugLogging = 1
 
 ### Test 1 — plugin 3D only
 
-Set:
+Leave:
 
 ```ini
 HUDMode = 0
