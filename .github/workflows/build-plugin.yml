@@ -5,10 +5,39 @@ on:
   push:
     paths:
       - 'plugin/**'
+      - 'tools/trace_hud_candidates.py'
       - 'docs/PLUGIN_TEST.md'
       - '.github/workflows/build-plugin.yml'
 
 jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install analysis dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Trace HUD and camera candidates
+        run: |
+          python tools/trace_hud_candidates.py \
+            --eboot ULUS10466_EBOOT.BIN \
+            --output diagnostics-ci/HUD_TRACE.md
+
+      - name: Upload analysis trace
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tekken6-HUD-camera-trace
+          path: diagnostics-ci/HUD_TRACE.md
+          if-no-files-found: error
+
   build:
     runs-on: ubuntu-latest
     container: pspdev/pspdev:latest
