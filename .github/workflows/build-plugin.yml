@@ -1,0 +1,56 @@
+name: Build PPSSPP plugin
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/build-plugin.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: pspdev/pspdev:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build PRX
+        id: build
+        shell: sh
+        run: |
+          set +e
+          make -C plugin clean all > plugin/build.log 2>&1
+          status=$?
+          cat plugin/build.log
+          exit $status
+
+      - name: Package PPSSPP plugin
+        if: success()
+        shell: sh
+        run: |
+          set -eu
+          DEST="dist/PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix"
+          mkdir -p "$DEST"
+          cp plugin/Tekken6.PPSSPP.UltrawideFix.prx "$DEST/"
+          cp plugin/package/plugin.ini "$DEST/"
+          cp plugin/package/Tekken6.PPSSPP.UltrawideFix.ini "$DEST/"
+          cp docs/PLUGIN_TEST.md dist/TESTING.md
+          find dist -maxdepth 5 -type f -print
+
+      - name: Upload plugin package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tekken6-PPSSPP-UltrawideFix
+          path: dist/
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tekken6-PPSSPP-UltrawideFix-build-log
+          path: plugin/build.log
+          if-no-files-found: warn
