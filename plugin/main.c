@@ -339,7 +339,7 @@ int module_start(SceSize args, void *argp) {
     phud = patch_hud(aspect);
 
     sceKernelDcacheWritebackAll();
-    sceKernelIcacheClearAll();
+    sceKernelIcacheInvalidateAll();
 
     if (p3d == 4) log_text("3D: all four verified aspect sites patched successfully\n");
     else log_text("3D: not all verified aspect sites were patched; inspect log/signatures\n");
