@@ -7,7 +7,13 @@ on:
       - 'plugin/**'
       - 'tools/trace_hud_candidates.py'
       - 'docs/PLUGIN_TEST.md'
+      - 'docs/STATUS.md'
+      - 'README.md'
+      - 'RELEASE_v0.4.md'
       - '.github/workflows/build-plugin.yml'
+
+permissions:
+  contents: write
 
 jobs:
   analyze:
@@ -67,6 +73,8 @@ jobs:
           cp plugin/package/plugin.ini "$DEST/"
           cp plugin/package/Tekken6.PPSSPP.UltrawideFix.ini "$DEST/"
           cp docs/PLUGIN_TEST.md dist/TESTING.md
+          cp README.md dist/README.md
+          cp RELEASE_v0.4.md dist/RELEASE_NOTES.md
           find dist -maxdepth 5 -type f -print
 
       - name: Upload plugin package
@@ -84,3 +92,39 @@ jobs:
           name: Tekken6-PPSSPP-UltrawideFix-build-log
           path: plugin/build.log
           if-no-files-found: warn
+
+  release:
+    if: github.event_name == 'push' && github.event.head_commit.message == 'release: v0.4'
+    needs:
+      - analyze
+      - build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download packaged plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: Tekken6-PPSSPP-UltrawideFix
+          path: release-dist
+
+      - name: Create release ZIP
+        run: |
+          set -eu
+          cd release-dist
+          zip -r ../Tekken6-PPSSPP-UltrawideFix-v0.4.zip .
+
+      - name: Publish v0.4
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release create v0.4 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Tekken 6 PPSSPP Ultrawide Fix v0.4" \
+            --notes-file RELEASE_v0.4.md \
+            --latest \
+            Tekken6-PPSSPP-UltrawideFix-v0.4.zip

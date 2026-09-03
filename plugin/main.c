@@ -4,7 +4,7 @@
 #include <psputils.h>
 #include <stdint.h>
 
-PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 2);
+PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 4);
 PSP_NO_CREATE_MAIN_THREAD();
 
 #define CONFIG_PATH "ms0:/PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.ini"
@@ -12,10 +12,12 @@ PSP_NO_CREATE_MAIN_THREAD();
 
 #define BASE_ASPECT (16.0f / 9.0f)
 #define ASPECT_SITE_COUNT 4
+#define CAMERA_SITE 0x0895350Cu
 #define DEFAULT_PATCH_INTERVAL_MS 77
 
 #define ORIGINAL_ASPECT_HI 0x3C013FE3u
 #define ORIGINAL_ASPECT_LO 0x34218E39u
+#define ORIGINAL_CAMERA_WORD 0x3C013F80u
 #define MIPS_EMUHACK_OPCODE 0x68000000u
 #define MIPS_EMUHACK_MASK   0xFC000000u
 
@@ -28,15 +30,19 @@ static const uint32_t kAspectSites[ASPECT_SITE_COUNT] = {
 
 typedef struct Config {
     int enable3D;
+    int enableCamera;
+    int cameraPreset;
     int debugLogging;
     int aspectNum;
     int aspectDen;
     int patchIntervalMs;
 } Config;
 
-static Config g_cfg = { 1, 1, 20, 9, DEFAULT_PATCH_INTERVAL_MS };
+/* v0.4 public defaults: 20:9 ultrawide + Wider camera, quiet logging. */
+static Config g_cfg = { 1, 1, 2, 0, 20, 9, DEFAULT_PATCH_INTERVAL_MS };
 static volatile int g_running = 1;
-static int g_loggedUnexpected = 0;
+static int g_loggedUnexpected3D = 0;
+static int g_loggedUnexpectedCamera = 0;
 
 static int str_len(const char *s) {
     int n = 0;
@@ -111,6 +117,15 @@ static void log_pair(const char *prefix, uint32_t address) {
     hex8(b, h); raw_log("0x"); raw_log(h); raw_log("\n");
 }
 
+static void log_word(const char *prefix, uint32_t address) {
+    char h[9];
+    uint32_t value = *(volatile uint32_t *)address;
+    if (!g_cfg.debugLogging) return;
+    raw_log(prefix);
+    hex8(address, h); raw_log("0x"); raw_log(h); raw_log(" = ");
+    hex8(value, h); raw_log("0x"); raw_log(h); raw_log("\n");
+}
+
 static void parse_aspect(char *value) {
     char *colon = value;
     while (*colon && *colon != ':') colon++;
@@ -149,6 +164,12 @@ static void parse_config_line(char *line) {
     value = trim(eq);
 
     if (str_eq(key, "Enable3D")) g_cfg.enable3D = parse_int(value, g_cfg.enable3D) != 0;
+    else if (str_eq(key, "EnableCamera")) g_cfg.enableCamera = parse_int(value, g_cfg.enableCamera) != 0;
+    else if (str_eq(key, "CameraPreset")) {
+        g_cfg.cameraPreset = parse_int(value, g_cfg.cameraPreset);
+        if (g_cfg.cameraPreset < 0) g_cfg.cameraPreset = 0;
+        if (g_cfg.cameraPreset > 3) g_cfg.cameraPreset = 3;
+    }
     else if (str_eq(key, "DebugLogging")) g_cfg.debugLogging = parse_int(value, g_cfg.debugLogging) != 0;
     else if (str_eq(key, "ForceAspectRatio")) parse_aspect(value);
     else if (str_eq(key, "PatchIntervalMs")) {
@@ -191,6 +212,13 @@ static float get_target_aspect(void) {
     return (float)g_cfg.aspectNum / (float)g_cfg.aspectDen;
 }
 
+static uint32_t get_target_camera_word(void) {
+    int preset = g_cfg.cameraPreset;
+    if (preset < 0) preset = 0;
+    if (preset > 3) preset = 3;
+    return 0x3C010000u | (uint32_t)(0x3F80 + preset);
+}
+
 static void aspect_instructions(float aspect, uint32_t *hiInstr, uint32_t *loInstr) {
     union { float f; uint32_t u; } bits;
     bits.f = aspect;
@@ -203,6 +231,10 @@ static int pair_is(uint32_t address, uint32_t a, uint32_t b) {
            *(volatile uint32_t *)(address + 4u) == b;
 }
 
+static int word_is(uint32_t address, uint32_t value) {
+    return *(volatile uint32_t *)address == value;
+}
+
 static int is_emuhack(uint32_t word) {
     return (word & MIPS_EMUHACK_MASK) == MIPS_EMUHACK_OPCODE;
 }
@@ -210,19 +242,13 @@ static int is_emuhack(uint32_t word) {
 /*
  * PPSSPP's CWCheat engine invalidates translated code BEFORE reading/writing a
  * code address. That matters because the JIT writes 0x68xxxxxx emuhack tokens
- * into the first guest instruction of compiled blocks. v0.2 wrote first and
- * invalidated afterwards, which did not faithfully reproduce CWCheat behavior.
+ * into the first guest instruction of compiled blocks.
  *
- * v0.3 deliberately mirrors the CWCheat ordering:
- *   1. invalidate JIT range (restores any emuhack first opcode)
- *   2. inspect the restored guest instruction
- *   3. write the target instruction pair
- *   4. write back data cache
- *
- * We do not invalidate again after the write. The range was already removed
- * from the JIT cache, so its next execution must compile from the patched words.
+ * v0.3 proved the 3D foundation by mirroring that ordering. v0.4 keeps the
+ * same known-good behavior and applies the documented camera instruction with
+ * the same pre-invalidate/writeback discipline.
  */
-static int patch_one_site(uint32_t address, uint32_t targetHi, uint32_t targetLo, int verbose) {
+static int patch_one_aspect_site(uint32_t address, uint32_t targetHi, uint32_t targetLo, int verbose) {
     uint32_t a;
     uint32_t b;
 
@@ -238,9 +264,9 @@ static int patch_one_site(uint32_t address, uint32_t targetHi, uint32_t targetLo
 
     if (!((a == ORIGINAL_ASPECT_HI && b == ORIGINAL_ASPECT_LO) ||
           (a == targetHi && b == targetLo))) {
-        if (verbose || !g_loggedUnexpected) {
+        if (verbose || !g_loggedUnexpected3D) {
             log_pair("3D: unexpected restored pair; skipped: ", address);
-            g_loggedUnexpected = 1;
+            g_loggedUnexpected3D = 1;
         }
         return 0;
     }
@@ -253,7 +279,7 @@ static int patch_one_site(uint32_t address, uint32_t targetHi, uint32_t targetLo
     return pair_is(address, targetHi, targetLo);
 }
 
-static int patch_cycle(float aspect, int verbose) {
+static int patch_aspect_cycle(float aspect, int verbose) {
     uint32_t targetHi;
     uint32_t targetLo;
     int i;
@@ -261,27 +287,67 @@ static int patch_cycle(float aspect, int verbose) {
 
     aspect_instructions(aspect, &targetHi, &targetLo);
     for (i = 0; i < ASPECT_SITE_COUNT; i++)
-        ok += patch_one_site(kAspectSites[i], targetHi, targetLo, verbose);
+        ok += patch_one_aspect_site(kAspectSites[i], targetHi, targetLo, verbose);
     return ok;
+}
+
+static int patch_camera(int verbose) {
+    uint32_t current;
+    uint32_t target = get_target_camera_word();
+
+    sceKernelIcacheInvalidateRange((const void *)CAMERA_SITE, 4u);
+    current = *(volatile uint32_t *)CAMERA_SITE;
+
+    if (is_emuhack(current)) {
+        if (verbose) log_word("Camera: emuhack still present after pre-invalidate: ", CAMERA_SITE);
+        return 0;
+    }
+
+    if (!(current == ORIGINAL_CAMERA_WORD || current == target)) {
+        if (verbose || !g_loggedUnexpectedCamera) {
+            log_word("Camera: unexpected restored word; skipped: ", CAMERA_SITE);
+            g_loggedUnexpectedCamera = 1;
+        }
+        return 0;
+    }
+
+    *(volatile uint32_t *)CAMERA_SITE = target;
+    sceKernelDcacheWritebackRange((const void *)CAMERA_SITE, 4u);
+
+    if (verbose) log_word("Camera: CWCheat-order write/readback: ", CAMERA_SITE);
+    return word_is(CAMERA_SITE, target);
 }
 
 static int patch_thread(SceSize args, void *argp) {
     float aspect = get_target_aspect();
-    int first = 1;
+    int first3D = 1;
+    int firstCamera = 1;
     (void)args;
     (void)argp;
 
     while (g_running) {
         if (g_cfg.enable3D) {
-            int ok = patch_cycle(aspect, first);
-            if (first) {
+            int ok = patch_aspect_cycle(aspect, first3D);
+            if (first3D) {
                 if (ok == ASPECT_SITE_COUNT)
                     log_text("3D: first CWCheat-order cycle patched all four sites\n");
                 else
                     log_text("3D: first CWCheat-order cycle did not patch all four sites\n");
-                first = 0;
+                first3D = 0;
             }
         }
+
+        if (g_cfg.enableCamera) {
+            int ok = patch_camera(firstCamera);
+            if (firstCamera) {
+                if (ok)
+                    log_text("Camera: first CWCheat-order cycle patched the camera site\n");
+                else
+                    log_text("Camera: first CWCheat-order cycle did not patch the camera site\n");
+                firstCamera = 0;
+            }
+        }
+
         sceKernelDelayThread((unsigned int)g_cfg.patchIntervalMs * 1000u);
     }
     return 0;
@@ -294,7 +360,7 @@ int module_start(SceSize args, void *argp) {
     (void)argp;
 
     sceIoRemove(LOG_PATH);
-    raw_log("=== Tekken6.PPSSPP.UltrawideFix v0.3 CWCheat-order diagnostic ===\n");
+    raw_log("=== Tekken6.PPSSPP.UltrawideFix v0.4 ===\n");
     raw_log("Plugin module_start reached successfully\n");
 
     read_config();
@@ -304,11 +370,14 @@ int module_start(SceSize args, void *argp) {
         log_pair("3D restored pre-thread: ", kAspectSites[i]);
     }
 
-    thread = sceKernelCreateThread("T6UWCWOrder", patch_thread, 0x20, 0x3000, 0, 0);
+    sceKernelIcacheInvalidateRange((const void *)CAMERA_SITE, 4u);
+    log_word("Camera restored pre-thread: ", CAMERA_SITE);
+
+    thread = sceKernelCreateThread("T6UWRuntime", patch_thread, 0x20, 0x3000, 0, 0);
     if (thread >= 0 && sceKernelStartThread(thread, 0, 0) >= 0)
-        log_text("3D: continuous CWCheat-order patch thread started\n");
+        log_text("Runtime: continuous patch thread started\n");
     else
-        log_text("3D: failed to start continuous patch thread\n");
+        log_text("Runtime: failed to start continuous patch thread\n");
 
     raw_log("=== module_start complete ===\n");
     return 0;

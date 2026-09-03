@@ -4,7 +4,7 @@ Last updated: 2026-09-03
 
 ## Current Phase
 
-Phase 6C: reproduce PPSSPP CWCheat's JIT invalidation/write behavior from a PRX before resuming HUD work.
+Phase 7: v0.4 public beta — preserve the validated v0.3 3D runtime foundation, integrate the known wider camera patch, and continue targeted HUD/UI reverse engineering.
 
 ## What is verified
 
@@ -22,6 +22,12 @@ Phase 6C: reproduce PPSSPP CWCheat's JIT invalidation/write behavior from a PRX 
 - Exact 20:9 pair:
   - `0x3C01400E`
   - `0x342138E4`
+- v0.3's invalidate-before-write PRX approach was visually tested successfully and is now the validated 3D plugin baseline.
+- The documented gameplay-camera instruction is at `0x0895350C`:
+  - Original: `0x3C013F80`
+  - Slightly Wider: `0x3C013F81`
+  - Wider: `0x3C013F82`
+  - Widest: `0x3C013F83`
 - Generic orthographic Paths A/B/C were user-tested visible no-ops for HUD/UI/menu screens.
 - The Warriors Fusion Fix uses separate 3D aspect and HUD-scale hooks; Tekken still needs its actual HUD-scale equivalent identified.
 
@@ -29,26 +35,17 @@ Phase 6C: reproduce PPSSPP CWCheat's JIT invalidation/write behavior from a PRX 
 
 FAILED/UNVERIFIED. Both 3D and HUD appeared stretched. It used fixed addresses and mixed HUD experiments into the first PRX test.
 
-## v0.2 result and uploaded log
+## v0.2 result
 
-The user's v0.2 log proves:
-
-1. the PRX loaded successfully,
-2. the live Tekken module was present at `0x08804000`, size `0x003F62A8`,
-3. all four exact aspect sites were found correctly,
-4. all four sites initially contained the original pair,
-5. all four sites were written to the exact 20:9 pair and immediate readback succeeded,
-6. the first site's high word later became `0x6806F70C` while the low word remained patched.
-
-The important correction is that `0x6806F70C` is not a Tekken-side reversion. PPSSPP reserves the `0x68000000` opcode family for JIT/emuhack block markers. Therefore v0.2's monitor incorrectly interpreted normal PPSSPP JIT behavior as a restored/changed game instruction.
+The v0.2 log proved the PRX loaded and wrote the correct four 3D aspect sites. It also exposed PPSSPP's `0x68xxxxxx` JIT/emuhack block markers. Those markers were initially mistaken for game-side code reversion.
 
 See `docs/PLUGIN_V02_LOG_ANALYSIS.md`.
 
-## Why v0.3 exists
+## v0.3 result
 
-PPSSPP's own CWCheat engine invalidates JIT/instruction-cache state **before** reading/writing a cheat code address. v0.2 wrote first, then invalidated.
+SUCCESSFUL 3D BASELINE.
 
-v0.3 changes the order to mirror CWCheat more closely:
+v0.3 changed the ordering to mirror PPSSPP CWCheat more closely:
 
 1. `sceKernelIcacheInvalidateRange()` first,
 2. inspect the restored guest instruction,
@@ -56,41 +53,47 @@ v0.3 changes the order to mirror CWCheat more closely:
 4. `sceKernelDcacheWritebackRange()`,
 5. repeat continuously at a configurable cadence (default 77 ms).
 
-This deliberately prioritizes behavioral equivalence with the known-good CWCheat over elegance. If it works visually, the next version should replace repeated writes with a cleaner Warriors-style hook.
+The user tested the resulting plugin and confirmed that it worked. This closes the PRX/JIT foundation question and allows development to move forward from a known-good plugin baseline.
 
-## Current v0.3 package
+## v0.4 implementation
 
-Supplied INI:
+v0.4 keeps the validated v0.3 3D path and adds the known camera adjustment using the same invalidate-before-write discipline.
+
+Default package:
 
 ```ini
 [MAIN]
 ForceAspectRatio = 20:9
 Enable3D = 1
+
+EnableCamera = 1
+CameraPreset = 2
+
 PatchIntervalMs = 77
-DebugLogging = 1
+DebugLogging = 0
 ```
 
-HUD correction is still disabled.
+`CameraPreset = 2` is the project's previously documented **Wider** value (`0x3F82`). The camera can be disabled independently or changed between Original / Slightly Wider / Wider / Widest without rebuilding the PRX.
 
-## Required user test
+v0.4 is labeled beta because the combined PRX camera integration is new even though the underlying camera address/value research and the v0.3 3D foundation are established.
 
-1. Disable the Tekken widescreen CWCheat.
-2. Keep PPSSPP Display Layout = Stretch.
-3. Enable plugins for Tekken 6.
-4. Cold boot the game and enter a fight.
-5. Test v0.3 at `20:9`.
-6. If the 20:9 result is still visually unchanged/uncertain, edit only:
+## HUD/UI research status
 
-```ini
-ForceAspectRatio = 4:1
-```
+HUD correction remains disabled in v0.4.
 
-and cold boot again.
+The project's current evidence says not to patch generic 480×272 projection constants globally. Focused CI tracing instead highlighted:
 
-Interpretation:
+- descriptor/render family around `0x08A391xx`–`0x08A39Axx`,
+- coordinate/set helper `0x08A39158`,
+- initializer `0x08A392F0`,
+- follow-up float/property helper `0x08A39808`.
 
-- 20:9 correct: PRX runtime foundation proven; resume HUD research.
-- 4:1 visibly changes 3D: PRX patching is active; investigate aspect semantics/compensation.
-- 4:1 still no visible change while the log reports successful cycles: stop emulating CWCheat writes and move to a true Warriors-style projection hook at the live `$f12` perspective input or active callers.
+The suspected `+0x4C` structure field is not safe to patch globally: static analysis found it used broadly across the executable. Future work must identify a callsite-specific or subsystem-specific HUD scale/coordinate path before enabling any UI patch in a release.
 
-After testing, send the new plugin log. Detailed steps are in `docs/PLUGIN_TEST.md`.
+## Immediate next steps
+
+1. Device-test v0.4 with `CameraPreset = 2` and confirm the combined PRX produces the same wider camera behavior as the known cheat/INI value.
+2. Test `CameraPreset = 0`, `1`, and `3` to confirm the plugin switch behaves independently of the 3D aspect fix.
+3. Continue tracing the `0x08A39808` caller families and descriptor ownership to isolate battle HUD/menu callsites.
+4. Keep overlays, health bars, menus, and general 2D projection experiments separated until a dedicated hook is proven.
+5. Only after a safe HUD hook is validated should it become enabled by default in a future release.
