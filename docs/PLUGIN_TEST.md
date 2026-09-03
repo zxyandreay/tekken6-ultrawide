@@ -1,47 +1,20 @@
-# Tekken 6 PPSSPP Ultrawide Fix — first plugin test
+# Tekken 6 PPSSPP Ultrawide Fix — v0.2 runtime diagnostic
 
 Last updated: 2026-09-03
 
-## What is verified vs experimental
+## Why this build exists
 
-### Verified component: 3D aspect patch
+The first PRX build did **not** reproduce the user's known-good CWCheat result: both 3D and HUD/UI still appeared stretched with `HUDMode` off and on.
 
-The plugin patches the same four ULUS10466 aspect-dispatch locations already proven by the known-good 20:9 CWCheat:
+Therefore v0.2 removes the HUD experiment from the test path and answers one question first:
 
-- `0x08945F10`
-- `0x08946794`
-- `0x08946BC8`
-- `0x08947D90`
+> Is PPSSPP actually starting the PRX, and are the exact four known-good Tekken 6 aspect instructions being found, written, read back, and kept active in the live game module?
 
-At each location it verifies the expected MIPS instruction pair (`lui at,...` + `ori at,at,...`) before writing the requested aspect float. The initial POCO F5 configuration uses exact `20:9`.
+Do not use v0.2 to evaluate HUD correction. HUD work resumes only after this test proves the PRX 3D path.
 
-This part is expected to reproduce the existing correct 3D ultrawide behavior without requiring CWCheat.
+## Install
 
-### Experimental component: HUD correction
-
-The current repository still does **not** prove the live HUD ownership path. The first plugin therefore exposes two isolated Warriors-style candidate groups instead of pretending the HUD is solved.
-
-`HUDMode = 1` patches three `480.0` LUI loads in the higher-ranked general 2D/render-descriptor candidate around `0x08A3916C–0x08A396D8`:
-
-- `0x08A39288`
-- `0x08A392F4`
-- `0x08A39360`
-
-For a 20:9 display, the plugin changes those 480.0 logical-width loads to exactly 600.0. This is the mathematically correct virtual width for preserving a 16:9 HUD inside a 20:9 stretched output, but it remains an ownership hypothesis until visually validated.
-
-`HUDMode = 2` isolates the second candidate around `0x08AA62D8–0x08AA655C`:
-
-- `0x08AA6314`
-- `0x08AA63B8`
-- `0x08AA64C0`
-
-This second family appears mask-like and is intentionally kept separate because it may correspond to fades, masks, clipping, or overlays rather than ordinary HUD.
-
-`HUDMode = 3` applies both groups and should only be used after the isolated tests.
-
-## Installation
-
-Download the build artifact from the GitHub Actions `Build PPSSPP plugin` workflow and extract it into the PPSSPP memstick root. The resulting files should be:
+Extract the package into the active PPSSPP memstick root so these files exist:
 
 ```text
 PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
@@ -50,91 +23,146 @@ PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
 └── plugin.ini
 ```
 
-The manifest is restricted to USA Tekken 6 `ULUS10466`.
+The manifest supports:
 
-## PPSSPP setup for the POCO F5 test
+```text
+ULUS10466
+```
 
-1. Disable the existing Tekken 6 20:9 CWCheat. The plugin should be the only aspect patch during the test.
-2. Keep PPSSPP Display Layout set to `Stretch`, matching the previous verified test setup.
-3. The supplied package starts safely with HUD correction disabled:
+only.
+
+## Configuration
+
+Use the supplied INI unchanged:
 
 ```ini
 [MAIN]
 ForceAspectRatio = 20:9
 Enable3D = 1
-HUDMode = 0
-HUDVirtualWidth = 600
 DebugLogging = 1
 ```
 
-4. Fully close and relaunch Tekken 6 after every configuration change. The PRX patches game memory at boot.
+## PPSSPP test conditions
 
-## Test sequence
+1. Disable the old Tekken 6 widescreen CWCheat.
+2. Keep PPSSPP Display Layout = `Stretch`.
+3. Make sure PPSSPP plugins are enabled for the game.
+4. Fully close Tekken 6 / PPSSPP before the test.
+5. For this diagnostic, do **not** manually load a savestate.
+6. If PPSSPP is configured to auto-load a savestate, disable that for this test.
+7. Launch Tekken 6 normally.
 
-### Test 1 — plugin 3D only
+PPSSPP should normally display a short `Loaded plugin: ...` message when a PRX plugin starts successfully.
 
-Leave:
+## What v0.2 does differently
 
-```ini
-HUDMode = 0
-```
+### Fresh startup marker
 
-Expected result: the 3D scene should look the same as the known-good 20:9 CWCheat while the HUD remains stretched. If the 3D scene is not correct, stop HUD testing and send the plugin log.
-
-### Test 2 — candidate group A
-
-Set:
-
-```ini
-HUDMode = 1
-```
-
-Check at minimum:
-
-- health bars and health fill,
-- timer / round indicators,
-- player names and icons,
-- character-select UI,
-- pause menu,
-- normal menu panels,
-- dark pause overlay / fades.
-
-Useful outcomes are not limited to a perfect fix. Classification is valuable:
-
-- If ordinary HUD becomes narrower/correct while full-screen overlays remain full-screen, group A is a strong Warriors-style HUD path.
-- If only some HUD categories change, the path is useful but needs caller/category separation.
-- If dark overlays shrink or stop covering the whole display, the path mixes HUD and full-screen masks and must be split in the final plugin.
-- If nothing visible changes, group A is not the live visible HUD path and should be rejected.
-- If corruption occurs, immediately return to `HUDMode = 0`; no persistent game data is modified.
-
-### Test 3 — candidate group B
-
-Only after recording Test 2, set:
-
-```ini
-HUDMode = 2
-```
-
-This specifically helps determine whether the second family controls masks/overlays rather than ordinary HUD.
-
-### Test 4 — both groups
-
-Use `HUDMode = 3` only if Tests 2 and 3 show complementary behavior. Do not use this as the first test because it would hide which path owns each visual category.
-
-## Log file
-
-With `DebugLogging = 1`, inspect:
+At the start of `module_start`, it deletes the prior log and immediately creates a new log containing:
 
 ```text
-PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log
+=== Tekken6.PPSSPP.UltrawideFix v0.2 runtime diagnostic ===
+Plugin module_start reached successfully
 ```
 
-The plugin records whether each verified 3D site and each experimental HUD candidate site matched its expected instruction shape and was patched.
+If a fresh log with this header does not appear, stop. The plugin is not starting and no Tekken rendering conclusion should be drawn.
 
-If a signature does not match, the plugin skips that write instead of blindly patching memory.
+### Live module discovery
 
-## Reliability statement
+The PRX enumerates PSP modules and logs their names, text addresses, and text sizes.
 
-The current repository findings are sufficient to make the **3D plugin path reliable for this exact ULUS10466 executable**, because it directly reproduces a user-verified CWCheat and validates each instruction before writing.
+It searches live module text for the exact verified layout of the four Tekken aspect case-0 instruction pairs.
 
-The repository findings are **not yet sufficient to call the HUD fix reliable**. The HUD portion of this build is deliberately a controlled runtime experiment that tests the two best current Warriors-style candidates with isolated modes and logging. A final `FixHUD = 1` implementation should only replace these diagnostic modes after one candidate is visually and structurally confirmed.
+The verified relative spacing is:
+
+```text
+site 1 +0x0000
+site 2 +0x0884
+site 3 +0x0CB8
+site 4 +0x1E80
+```
+
+Original pair:
+
+```text
+0x3C013FE3
+0x34218E39
+```
+
+20:9 pair:
+
+```text
+0x3C01400E
+0x342138E4
+```
+
+### Exact write/readback
+
+For every accepted site, v0.2 writes the 20:9 pair, flushes the corresponding data-cache range, invalidates the exact PPSSPP/JIT instruction range, and immediately reads both instructions back.
+
+A fully successful runtime patch should include four lines resembling:
+
+```text
+3D patched/readback: 0x........ = 0x3C01400E 0x342138E4
+```
+
+followed by:
+
+```text
+3D: all four sites patched and immediate readback verified
+```
+
+### Early-boot monitor
+
+The plugin checks the sites for roughly three seconds after startup.
+
+If something restores or changes the code, the log will contain:
+
+```text
+3D monitor: patch was reverted/changed; reapplying
+```
+
+If the target instructions remain stable, the end should contain:
+
+```text
+3D monitor: target instructions remained present through early boot
+```
+
+## What to send back
+
+After the test, send this file:
+
+```text
+PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
+Tekken6.PPSSPP.UltrawideFix.log
+```
+
+Also say whether the 3D scene now visually matches the known-good CWCheat.
+
+## How the result will be interpreted
+
+### A. No fresh log exists
+
+The PRX never started. Investigate active memstick path, PPSSPP plugin setting, DISC_ID matching, or load failure.
+
+### B. Log starts, but no four-site signature is found
+
+The live runtime executable/module layout differs from what the static EBOOT analysis predicted, or the main module is not visible when expected. The logged module list and known-address pre-scan values will tell us which.
+
+### C. Four writes succeed, then are reverted
+
+Startup ordering, state loading, or another runtime action is undoing the patch. The monitor will prove it rather than leaving us to guess.
+
+### D. Four writes/readbacks succeed and remain stable, but 3D still looks stretched
+
+This is a deeper PPSSPP/runtime issue. The next step is to compare the PRX code-write/JIT path against PPSSPP's CWCheat implementation and verify which projection path is actually executing.
+
+### E. 3D finally matches the CWCheat
+
+The PRX runtime foundation is proven. Then resume the real goal: identify and implement Tekken's separate HUD-scale path analogous to The Warriors Fusion Fix.
+
+## HUD note
+
+There is intentionally no `HUDMode` in the v0.2 package INI.
+
+The previous Group A/B paths remain research hypotheses, not a working HUD fix. Testing them before the PRX 3D path is verified would mix two different problems and produce ambiguous results.
