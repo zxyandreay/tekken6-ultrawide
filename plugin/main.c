@@ -1,9 +1,11 @@
 #include <pspuser.h>
 #include <pspiofilemgr.h>
 #include <pspthreadman.h>
+#include <pspmodulemgr.h>
+#include <psputils.h>
 #include <stdint.h>
 
-PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 0);
+PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 1);
 PSP_NO_CREATE_MAIN_THREAD();
 
 #define CONFIG_PATH "ms0:/PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.ini"
@@ -11,46 +13,46 @@ PSP_NO_CREATE_MAIN_THREAD();
 
 #define EMULATOR_DEVCTL_GET_ASPECT_RATIO 0x31
 #define BASE_ASPECT (16.0f / 9.0f)
+#define ASPECT_SITE_COUNT 4
+#define MAX_MODULES 64
+
+#define ORIGINAL_ASPECT_HI 0x3C013FE3u
+#define ORIGINAL_ASPECT_LO 0x34218E39u
 
 /*
- * ULUS10466 verified 3D aspect-dispatch case-0 sites.
- * These are the same four locations used by the known-good CWCheat.
+ * Relative spacing between the four verified ULUS10466 aspect-dispatch
+ * case-0 instruction pairs.  This is used as a runtime signature rather
+ * than assuming that the main module is always loaded at the same address.
  */
-static const uint32_t kAspectSites[4] = {
-    0x08945F10,
-    0x08946794,
-    0x08946BC8,
-    0x08947D90,
+static const uint32_t kAspectRelative[ASPECT_SITE_COUNT] = {
+    0x0000u,
+    0x0884u,
+    0x0CB8u,
+    0x1E80u,
 };
 
-/*
- * Experimental Warriors-style HUD candidates from the current research.
- * Group A ranks as the stronger general 2D/render-descriptor candidate.
- * Group B appears mask-like and is kept separate so it can be classified.
+/* Known ULUS10466 addresses retained only as a signature-checked fallback
+ * and for diagnostics.  No fallback write is performed unless all four
+ * locations contain the expected original/target instruction shape.
  */
-static const uint32_t kHudGroupA[3] = {
-    0x08A39288,
-    0x08A392F4,
-    0x08A39360,
-};
-
-static const uint32_t kHudGroupB[3] = {
-    0x08AA6314,
-    0x08AA63B8,
-    0x08AA64C0,
+static const uint32_t kKnownAspectSites[ASPECT_SITE_COUNT] = {
+    0x08945F10u,
+    0x08946794u,
+    0x08946BC8u,
+    0x08947D90u,
 };
 
 typedef struct Config {
     int enable3D;
-    int hudMode;              /* 0=off, 1=A, 2=B, 3=A+B */
-    int hudVirtualWidth;      /* 0=derive from aspect */
     int debugLogging;
     int aspectAuto;
     int aspectNum;
     int aspectDen;
 } Config;
 
-static Config g_cfg = { 1, 1, 600, 1, 0, 20, 9 };
+static Config g_cfg = { 1, 1, 0, 20, 9 };
+static uint32_t g_aspectSites[ASPECT_SITE_COUNT];
+static int g_sitesFound = 0;
 
 static int str_len(const char *s) {
     int n = 0;
@@ -92,9 +94,9 @@ static int parse_int(const char *s, int fallback) {
     return any ? value * sign : fallback;
 }
 
-static void log_text(const char *s) {
+static void raw_log(const char *s) {
     SceUID fd;
-    if (!g_cfg.debugLogging || !s) return;
+    if (!s) return;
     fd = sceIoOpen(LOG_PATH, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_APPEND, 0777);
     if (fd >= 0) {
         sceIoWrite(fd, s, str_len(s));
@@ -102,23 +104,39 @@ static void log_text(const char *s) {
     }
 }
 
+static void log_text(const char *s) {
+    if (!g_cfg.debugLogging) return;
+    raw_log(s);
+}
+
 static void hex8(uint32_t value, char out[9]) {
     static const char h[] = "0123456789ABCDEF";
     int i;
     for (i = 0; i < 8; i++) {
-        out[7 - i] = h[value & 0xF];
+        out[7 - i] = h[value & 0xFu];
         value >>= 4;
     }
     out[8] = 0;
 }
 
-static void log_addr(const char *prefix, uint32_t address, const char *suffix) {
+static void log_hex(const char *prefix, uint32_t value, const char *suffix) {
     char h[9];
-    hex8(address, h);
-    log_text(prefix);
-    log_text("0x");
-    log_text(h);
-    log_text(suffix);
+    if (!g_cfg.debugLogging) return;
+    hex8(value, h);
+    raw_log(prefix);
+    raw_log("0x");
+    raw_log(h);
+    raw_log(suffix);
+}
+
+static void log_pair(const char *prefix, uint32_t address) {
+    uint32_t a = *(volatile uint32_t *)address;
+    uint32_t b = *(volatile uint32_t *)(address + 4u);
+    if (!g_cfg.debugLogging) return;
+    raw_log(prefix);
+    log_hex("", address, " = ");
+    log_hex("", a, " ");
+    log_hex("", b, "\n");
 }
 
 static void parse_aspect_value(char *value) {
@@ -166,8 +184,6 @@ static void parse_config_line(char *line) {
     value = trim(eq);
 
     if (str_eq(key, "Enable3D")) g_cfg.enable3D = parse_int(value, g_cfg.enable3D) != 0;
-    else if (str_eq(key, "HUDMode")) g_cfg.hudMode = parse_int(value, g_cfg.hudMode);
-    else if (str_eq(key, "HUDVirtualWidth")) g_cfg.hudVirtualWidth = parse_int(value, g_cfg.hudVirtualWidth);
     else if (str_eq(key, "DebugLogging")) g_cfg.debugLogging = parse_int(value, g_cfg.debugLogging) != 0;
     else if (str_eq(key, "ForceAspectRatio")) parse_aspect_value(value);
 }
@@ -180,10 +196,17 @@ static void read_config(void) {
     char *line;
 
     fd = sceIoOpen(CONFIG_PATH, PSP_O_RDONLY, 0);
-    if (fd < 0) return;
+    if (fd < 0) {
+        raw_log("Config: could not open INI; using built-in 20:9 defaults\n");
+        return;
+    }
+
     size = sceIoRead(fd, buf, sizeof(buf) - 1);
     sceIoClose(fd);
-    if (size <= 0) return;
+    if (size <= 0) {
+        raw_log("Config: INI was empty/unreadable; using defaults\n");
+        return;
+    }
     buf[size] = 0;
 
     line = buf;
@@ -194,32 +217,6 @@ static void read_config(void) {
             line = &buf[i + 1];
         }
     }
-
-    if (g_cfg.hudMode < 0 || g_cfg.hudMode > 3) g_cfg.hudMode = 0;
-}
-
-static uint32_t read32(uint32_t address) {
-    return *(volatile uint32_t *)address;
-}
-
-static void write32(uint32_t address, uint32_t value) {
-    *(volatile uint32_t *)address = value;
-}
-
-static int is_aspect_pair(uint32_t address) {
-    uint32_t a = read32(address);
-    uint32_t b = read32(address + 4);
-    return ((a & 0xFFFF0000u) == 0x3C010000u) &&
-           ((b & 0xFFFF0000u) == 0x34210000u);
-}
-
-static int wait_for_game_code(void) {
-    int i;
-    for (i = 0; i < 300; i++) {
-        if (is_aspect_pair(kAspectSites[0])) return 1;
-        sceKernelDelayThread(10000); /* 10 ms */
-    }
-    return 0;
 }
 
 static float get_target_aspect(void) {
@@ -231,125 +228,247 @@ static float get_target_aspect(void) {
             log_text("Aspect: PPSSPP auto value accepted\n");
             return aspect;
         }
-        log_text("Aspect: PPSSPP auto query failed; using configured ratio\n");
+        log_text("Aspect: PPSSPP auto query failed; using configured fallback\n");
     }
 
     if (g_cfg.aspectNum <= 0 || g_cfg.aspectDen <= 0) return BASE_ASPECT;
     return (float)g_cfg.aspectNum / (float)g_cfg.aspectDen;
 }
 
-static int patch_3d(float aspect) {
+static void aspect_instructions(float aspect, uint32_t *hiInstr, uint32_t *loInstr) {
     union { float f; uint32_t u; } bits;
-    uint32_t hi;
-    uint32_t lo;
-    int i;
-    int patched = 0;
-
     bits.f = aspect;
-    hi = (bits.u >> 16) & 0xFFFFu;
-    lo = bits.u & 0xFFFFu;
-
-    for (i = 0; i < 4; i++) {
-        uint32_t address = kAspectSites[i];
-        if (!is_aspect_pair(address)) {
-            log_addr("3D: signature mismatch at ", address, "; skipped\n");
-            continue;
-        }
-        write32(address,     0x3C010000u | hi); /* lui at, upper(aspect) */
-        write32(address + 4, 0x34210000u | lo); /* ori at, at, lower(aspect) */
-        log_addr("3D: patched ", address, "\n");
-        patched++;
-    }
-    return patched;
+    *hiInstr = 0x3C010000u | ((bits.u >> 16) & 0xFFFFu);
+    *loInstr = 0x34210000u | (bits.u & 0xFFFFu);
 }
 
-static int patch_hud_site(uint32_t address, float virtualWidth) {
-    union { float f; uint32_t u; } bits;
-    uint32_t word = read32(address);
-    uint32_t currentUpper;
-    uint32_t targetUpper;
+static int pair_is(uint32_t address, uint32_t a, uint32_t b) {
+    return *(volatile uint32_t *)address == a &&
+           *(volatile uint32_t *)(address + 4u) == b;
+}
 
-    bits.f = virtualWidth;
-    targetUpper = (bits.u >> 16) & 0xFFFFu;
+static int pair_is_original_or_target(uint32_t address, uint32_t targetHi, uint32_t targetLo) {
+    if (pair_is(address, ORIGINAL_ASPECT_HI, ORIGINAL_ASPECT_LO)) return 1;
+    if (pair_is(address, targetHi, targetLo)) return 1;
+    return 0;
+}
 
-    /* These candidate sites are LUI float loads. A one-word patch is only
-       exact when the target float has a zero lower half, as 600.0 does. */
-    if ((bits.u & 0xFFFFu) != 0) {
-        log_text("HUD: virtual width cannot be represented by safe one-word LUI patch; skipped\n");
-        return 0;
+static int validate_relative_signature(uint32_t first, uint32_t textEnd,
+                                       uint32_t targetHi, uint32_t targetLo,
+                                       uint32_t outSites[ASPECT_SITE_COUNT]) {
+    int i;
+    if (first + kAspectRelative[ASPECT_SITE_COUNT - 1] + 8u > textEnd) return 0;
+
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) {
+        uint32_t address = first + kAspectRelative[i];
+        if (!pair_is_original_or_target(address, targetHi, targetLo)) return 0;
+        outSites[i] = address;
     }
-    if ((word >> 26) != 0x0Fu) {
-        log_addr("HUD: expected LUI at ", address, "; skipped\n");
-        return 0;
-    }
-
-    currentUpper = word & 0xFFFFu;
-    if (currentUpper != 0x43F0u && currentUpper != targetUpper) {
-        log_addr("HUD: unexpected 480.0 signature at ", address, "; skipped\n");
-        return 0;
-    }
-
-    write32(address, (word & 0xFFFF0000u) | targetUpper);
-    log_addr("HUD: patched candidate at ", address, "\n");
     return 1;
 }
 
-static int patch_hud_group(const uint32_t *sites, int count, float virtualWidth) {
+static int find_sites_in_module(const SceKernelModuleInfo *info,
+                                uint32_t targetHi, uint32_t targetLo,
+                                uint32_t outSites[ASPECT_SITE_COUNT]) {
+    uint32_t start;
+    uint32_t end;
+    uint32_t address;
+
+    if (!info || info->text_size < 0x200000u) return 0;
+    start = info->text_addr;
+    end = info->text_addr + info->text_size;
+
+    for (address = start; address + kAspectRelative[ASPECT_SITE_COUNT - 1] + 8u <= end; address += 4u) {
+        if (!pair_is_original_or_target(address, targetHi, targetLo)) continue;
+        if (validate_relative_signature(address, end, targetHi, targetLo, outSites)) return 1;
+    }
+    return 0;
+}
+
+static int discover_aspect_sites(float aspect) {
+    SceUID modules[MAX_MODULES];
+    int moduleCount = 0;
+    int result;
+    int i;
+    uint32_t targetHi;
+    uint32_t targetLo;
+
+    aspect_instructions(aspect, &targetHi, &targetLo);
+
+    result = sceKernelGetModuleIdList(modules, sizeof(modules), &moduleCount);
+    if (result >= 0) {
+        log_hex("Modules: count=", (uint32_t)moduleCount, "\n");
+        if (moduleCount > MAX_MODULES) moduleCount = MAX_MODULES;
+
+        for (i = 0; i < moduleCount; i++) {
+            SceKernelModuleInfo info;
+            info.size = sizeof(info);
+            if (sceKernelQueryModuleInfo(modules[i], &info) < 0) continue;
+
+            if (g_cfg.debugLogging) {
+                raw_log("Module: ");
+                raw_log(info.name);
+                log_hex(" text=", info.text_addr, "");
+                log_hex(" size=", info.text_size, "\n");
+            }
+
+            if (find_sites_in_module(&info, targetHi, targetLo, g_aspectSites)) {
+                g_sitesFound = 1;
+                raw_log("3D: verified four-site relative signature found in module ");
+                raw_log(info.name);
+                raw_log("\n");
+                for (i = 0; i < ASPECT_SITE_COUNT; i++)
+                    log_pair("3D discovery: ", g_aspectSites[i]);
+                return 1;
+            }
+        }
+    } else {
+        log_text("Modules: sceKernelGetModuleIdList failed\n");
+    }
+
+    /* Signature-checked fixed-address fallback for this exact ULUS10466 EBOOT. */
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) {
+        if (!pair_is_original_or_target(kKnownAspectSites[i], targetHi, targetLo)) {
+            log_text("3D: fixed-address fallback signature check failed\n");
+            return 0;
+        }
+    }
+
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) g_aspectSites[i] = kKnownAspectSites[i];
+    g_sitesFound = 1;
+    log_text("3D: using verified fixed-address ULUS10466 fallback\n");
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) log_pair("3D fallback: ", g_aspectSites[i]);
+    return 1;
+}
+
+static int patch_3d(float aspect) {
+    uint32_t targetHi;
+    uint32_t targetLo;
     int i;
     int patched = 0;
-    for (i = 0; i < count; i++) patched += patch_hud_site(sites[i], virtualWidth);
+
+    if (!g_sitesFound) return 0;
+    aspect_instructions(aspect, &targetHi, &targetLo);
+
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) {
+        uint32_t address = g_aspectSites[i];
+
+        if (!pair_is_original_or_target(address, targetHi, targetLo)) {
+            log_pair("3D: unexpected pair before patch: ", address);
+            continue;
+        }
+
+        *(volatile uint32_t *)address = targetHi;
+        *(volatile uint32_t *)(address + 4u) = targetLo;
+
+        /* Use precise range invalidation. PPSSPP maps this user syscall to
+         * deferred JIT invalidation for the modified code range. */
+        sceKernelDcacheWritebackRange((const void *)address, 8u);
+        sceKernelIcacheInvalidateRange((const void *)address, 8u);
+
+        if (pair_is(address, targetHi, targetLo)) {
+            log_pair("3D patched/readback: ", address);
+            patched++;
+        } else {
+            log_pair("3D: readback mismatch: ", address);
+        }
+    }
+
     return patched;
 }
 
-static int patch_hud(float aspect) {
-    float width;
-    int patched = 0;
+static int verify_3d(float aspect) {
+    uint32_t targetHi;
+    uint32_t targetLo;
+    int i;
+    if (!g_sitesFound) return 0;
+    aspect_instructions(aspect, &targetHi, &targetLo);
+    for (i = 0; i < ASPECT_SITE_COUNT; i++) {
+        if (!pair_is(g_aspectSites[i], targetHi, targetLo)) return 0;
+    }
+    return 1;
+}
 
-    if (g_cfg.hudMode == 0) return 0;
+static int delayed_verify_thread(SceSize args, void *argp) {
+    float aspect;
+    int pass;
+    (void)args;
+    (void)argp;
 
-    if (g_cfg.hudVirtualWidth > 0) width = (float)g_cfg.hudVirtualWidth;
-    else width = 480.0f * (aspect / BASE_ASPECT);
+    aspect = get_target_aspect();
 
-    if (g_cfg.hudMode == 1 || g_cfg.hudMode == 3)
-        patched += patch_hud_group(kHudGroupA, 3, width);
-    if (g_cfg.hudMode == 2 || g_cfg.hudMode == 3)
-        patched += patch_hud_group(kHudGroupB, 3, width);
+    /* Verify several times during early boot. This is diagnostic: if the game
+     * or a savestate restores the original instructions after module_start,
+     * the log will expose that and we reapply while this thread remains alive.
+     */
+    for (pass = 1; pass <= 12; pass++) {
+        sceKernelDelayThread(250000); /* 250 ms */
+        if (!g_sitesFound) {
+            if (discover_aspect_sites(aspect) && g_cfg.enable3D) {
+                log_text("3D monitor: sites discovered after module_start; patching now\n");
+                patch_3d(aspect);
+            }
+            continue;
+        }
 
-    return patched;
+        if (g_cfg.enable3D && !verify_3d(aspect)) {
+            log_text("3D monitor: patch was reverted/changed; reapplying\n");
+            patch_3d(aspect);
+        }
+    }
+
+    if (g_sitesFound && verify_3d(aspect))
+        log_text("3D monitor: target instructions remained present through early boot\n");
+    else
+        log_text("3D monitor: target instructions were not stable/present\n");
+
+    return 0;
 }
 
 int module_start(SceSize args, void *argp) {
     float aspect;
-    int p3d = 0;
-    int phud = 0;
+    int patched = 0;
+    SceUID thread;
+    int i;
     (void)args;
     (void)argp;
 
+    /* Always reset/create a fresh log before INI parsing.  If this file does
+     * not appear, PPSSPP did not start this PRX (wrong memstick, plugins off,
+     * unsupported game ID, or load failure). */
+    sceIoRemove(LOG_PATH);
+    raw_log("=== Tekken6.PPSSPP.UltrawideFix v0.2 runtime diagnostic ===\n");
+    raw_log("Plugin module_start reached successfully\n");
+
     read_config();
-    log_text("\n=== Tekken6.PPSSPP.UltrawideFix start ===\n");
-
-    if (!wait_for_game_code()) {
-        log_text("Game code signature was not found. No patches applied.\n");
-        return 0;
-    }
-
     aspect = get_target_aspect();
 
-    if (g_cfg.enable3D) p3d = patch_3d(aspect);
-    phud = patch_hud(aspect);
+    for (i = 0; i < ASPECT_SITE_COUNT; i++)
+        log_pair("Known-address pre-scan: ", kKnownAspectSites[i]);
 
-    sceKernelDcacheWritebackAll();
-    sceKernelIcacheInvalidateAll();
-
-    if (p3d == 4) log_text("3D: all four verified aspect sites patched successfully\n");
-    else log_text("3D: not all verified aspect sites were patched; inspect log/signatures\n");
-
-    if (g_cfg.hudMode != 0) {
-        if (phud > 0) log_text("HUD: experimental candidate patch applied; visual validation required\n");
-        else log_text("HUD: experimental patch did not apply\n");
+    if (discover_aspect_sites(aspect)) {
+        if (g_cfg.enable3D) patched = patch_3d(aspect);
+        else log_text("3D: disabled in configuration\n");
+    } else {
+        log_text("3D: could not identify verified Tekken aspect sites; no write performed\n");
     }
 
-    log_text("=== patch pass complete ===\n");
+    if (patched == ASPECT_SITE_COUNT)
+        log_text("3D: all four sites patched and immediate readback verified\n");
+    else if (g_cfg.enable3D)
+        log_text("3D: four-site patch did not fully verify; inspect this log\n");
+
+    thread = sceKernelCreateThread("T6UWVerify", delayed_verify_thread, 0x20, 0x3000, 0, 0);
+    if (thread >= 0) {
+        if (sceKernelStartThread(thread, 0, 0) >= 0)
+            log_text("3D monitor: early-boot verification thread started\n");
+        else
+            log_text("3D monitor: failed to start verification thread\n");
+    } else {
+        log_text("3D monitor: failed to create verification thread\n");
+    }
+
+    raw_log("=== module_start complete ===\n");
     return 0;
 }
 
