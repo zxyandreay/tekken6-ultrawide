@@ -1,0 +1,22 @@
+# Copyrighted game images and compressed disc images. Never commit these.
+*.iso
+*.ISO
+*.cso
+*.CSO
+*.chd
+*.CHD
+Tekken 6 (USA) (En,Ja,Fr,De,Es,It,Ko,Ru).iso
+
+# Temporary extraction and reverse-engineering work areas.
+work/
+tmp/
+extracted/
+PSP_GAME/
+UMD_DATA.BIN
+*.pkg
+*.arc
+
+# Local/editor noise.
+.DS_Store
+Thumbs.db
+*.log
