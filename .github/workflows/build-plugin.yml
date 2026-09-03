@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: warn
 
   release:
-    if: github.event_name == 'push' && github.event.head_commit.message == 'release: v0.4'
+    if: "github.event_name == 'push' && github.event.head_commit.message == 'release: v0.4'"
     needs:
       - analyze
       - build
