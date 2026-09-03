@@ -21,6 +21,7 @@ FOCUSED_RANGES = [
     (0x08BC7D60, 0x08BC7DC0, "2D property table data"),
 ]
 DESCRIPTOR_OFFSETS = {0x10, 0x14, 0x18, 0x28, 0x2C, 0x30, 0x34, 0x40, 0x44, 0x48, 0x4C}
+SCALE_OFFSETS = {0x30, 0x34}
 
 
 def r2o(addr: int) -> int:
@@ -64,20 +65,19 @@ def disasm(data: bytes, start: int, end: int, title: str) -> list[str]:
 
 
 def probable_function_start(data: bytes, site: int) -> int:
-    # Prefer a normal addiu sp,sp,-N prologue with an RA save nearby.
     for a in range(site, max(SEG_VADDR, site - 0x800), -4):
         w = u32(data, a)
         if (w >> 16) == 0x27BD and (w & 0x8000):
             for b in range(a, min(a + 0x30, site + 4), 4):
                 wb = u32(data, b)
-                if (wb >> 16) == 0xAFBF:  # sw ra,imm(sp)
+                if (wb >> 16) == 0xAFBF:
                     return a
     return max(SEG_VADDR, site - 0x100)
 
 
 def probable_function_end(data: bytes, site: int) -> int:
     for a in range(site, min(SEG_VADDR + SEG_SIZE - 8, site + 0x1000), 4):
-        if u32(data, a) == 0x03E00008:  # jr ra
+        if u32(data, a) == 0x03E00008:
             return a + 8
     return site + 0x100
 
@@ -112,11 +112,7 @@ def tiny_setter_report(data: bytes) -> list[str]:
     found = set()
     for a in range(start, end - 8, 4):
         words = [u32(data, a + i * 4) for i in range(3)]
-        # Identify a store to a known descriptor offset followed within 2 words by jr ra.
-        useful = False
-        for w in words:
-            if (w >> 26) == 0x39 and (w & 0xFFFF) in DESCRIPTOR_OFFSETS:  # swc1
-                useful = True
+        useful = any((w >> 26) == 0x39 and (w & 0xFFFF) in DESCRIPTOR_OFFSETS for w in words)
         if useful and 0x03E00008 in words:
             found.add(a)
     for a in sorted(found):
@@ -126,6 +122,55 @@ def tiny_setter_report(data: bytes) -> list[str]:
         lines.append("```text")
         for p in range(a, a + 0x10, 4):
             lines.append(f"0x{p:08X}: {u32(data, p):08X}  {decode(md, data, p)}")
+        lines += ["```", ""]
+    return lines
+
+
+def scale_setter_report(data: bytes) -> list[str]:
+    """Find likely float scale setters storing f12 into descriptor +0x30/+0x34."""
+    md = Cs(CS_ARCH_MIPS, CS_MODE_MIPS32 + CS_MODE_LITTLE_ENDIAN)
+    lines = ["## Candidate X/Y scale setters (+0x30/+0x34)", ""]
+    end = SEG_VADDR + SEG_SIZE
+    hits = []
+    for a in range(SEG_VADDR, end - 4, 4):
+        w = u32(data, a)
+        opcode = w >> 26
+        base = (w >> 21) & 0x1F
+        ft = (w >> 16) & 0x1F
+        off = w & 0xFFFF
+        if opcode == 0x39 and base == 4 and ft == 12 and off in SCALE_OFFSETS:
+            hits.append(a)
+
+    if not hits:
+        lines += ["No `swc1 $f12,+0x30/+0x34($a0)` stores found.", ""]
+        return lines
+
+    for store in hits:
+        candidates = []
+        if store >= SEG_VADDR + 4 and u32(data, store - 4) == 0x03E00008:
+            candidates.append(store - 4)
+        candidates.append(store)
+        if store + 4 < end and u32(data, store + 4) == 0x03E00008:
+            candidates.append(store)
+
+        unique = []
+        for entry in candidates:
+            if entry not in unique:
+                unique.append(entry)
+
+        lines.append(f"### store `0x{store:08X}`: `{decode(md, data, store)}`")
+        for entry in unique:
+            refs = direct_xrefs(data, entry)
+            lines.append(
+                f"- possible entry `0x{entry:08X}` callers: " +
+                (", ".join(f"`0x{x:08X}`" for x in refs) if refs else "none")
+            )
+        lines.append("```text")
+        lo = max(SEG_VADDR, store - 0x10)
+        hi = min(end, store + 0x18)
+        for p in range(lo, hi, 4):
+            marker = "  <== SCALE STORE" if p == store else ""
+            lines.append(f"0x{p:08X}: {u32(data, p):08X}  {decode(md, data, p)}{marker}")
         lines += ["```", ""]
     return lines
 
@@ -149,6 +194,7 @@ def main() -> int:
         raise SystemExit("EBOOT is smaller than the mapped executable segment")
     lines = aspect_report(data)
     lines += tiny_setter_report(data)
+    lines += scale_setter_report(data)
     lines += xy_report(data)
     for start, end, title in FOCUSED_RANGES:
         lines += disasm(data, start, end, title)
