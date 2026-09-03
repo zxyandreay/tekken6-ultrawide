@@ -31,8 +31,8 @@ t6_native_2d_safe_viewport:
     mul.s   $f1, $f14, $f0
     sub.s   $f2, $f14, $f1
 
-    lui     $at, 0x3F00
-    mtc1    $at, $f3
+    lui     $t1, 0x3F00
+    mtc1    $t1, $f3
     mul.s   $f2, $f2, $f3
     add.s   $f12, $f12, $f2
     mov.s   $f14, $f1
