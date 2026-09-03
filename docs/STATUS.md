@@ -22,10 +22,11 @@ Phase 3: mapping the existing working 3D patch.
 - Added `tools/analyze_eboot.py` for repeatable ELF header inspection and known aspect address mapping.
 - Added a Capstone-based disassembly helper for the known aspect dispatch sites.
 - Documented the six-entry aspect dispatch tables and current projection-related evidence.
+- Added a simple MIPS xref scanner and recorded direct `j`/`jal` xref counts for the known aspect dispatch targets.
 
 ## Current Blocker
 
-None. Next work is caller discovery and stronger function-boundary analysis around the four verified aspect dispatches.
+None. Next work is inspecting direct callers and finding indirect owners for the larger projection-like function at `0x08947834`.
 
 ## Current Experimental Status
 

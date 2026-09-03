@@ -91,12 +91,25 @@ STRONG EVIDENCE:
 - `aspect_dispatch_1` begins at `0x08945ED4` and returns the selected aspect in `$f0`.
 - `aspect_dispatch_2` begins at `0x089466EC`; before the dispatch it converts a value at `0x34($s0)` using `65536.0 / 360.0`, then passes the selected aspect in `$f12` with values from `0x2c($s0)` and `0x30($s0)` to a call at `0x08ACA6C4`.
 - `aspect_dispatch_3` begins at `0x08946B6C`, resolves an object through `0xa4($a0)` and `0x6c($a0)`, then returns the selected aspect in `$f0`.
-- `aspect_dispatch_4` dispatches at `0x08947B58`; selected constants are used as divisors in `div.s $f0, $f2, $f0` before common code at `0x08947B98` multiplies by `0x3C8EFA35`, approximately degrees-to-radians.
+- `aspect_dispatch_4` is inside a larger function with a visible prologue at `0x08947834`; it dispatches at `0x08947B58`. Selected constants are used as divisors in `div.s $f0, $f2, $f0` before common code at `0x08947B98` multiplies by `0x3C8EFA35`, approximately degrees-to-radians. The compiler placed the switch case blocks after the main epilogue at `0x08947D64`-`0x08947D8C`.
 
 HYPOTHESIS:
 
 - `aspect_dispatch_2` and `aspect_dispatch_4` are directly involved in projection or camera/frustum setup.
 - `aspect_dispatch_1` and `aspect_dispatch_3` may be aspect getter/helper paths used by higher-level projection code.
+
+## Direct Xrefs
+
+VERIFIED:
+
+| Target | Direct `j`/`jal` xrefs found | Notes |
+| --- | --- | --- |
+| `0x08945ED4` | 6 | Four `jal`, one `j`, one additional `jal`; likely helper used by multiple projection paths |
+| `0x089466EC` | 1 | One direct `j` tail-call at `0x08956E20` |
+| `0x08946B6C` | 2 | Direct `jal` at `0x08863CA4` and `0x08863F28` |
+| `0x08947834` | 0 | No direct `j`/`jal` found; may be reached indirectly |
+
+Use `tools/find_mips_xrefs.py` to reproduce this scan.
 
 ## Pattern Signatures
 

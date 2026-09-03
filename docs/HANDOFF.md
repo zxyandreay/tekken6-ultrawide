@@ -33,7 +33,13 @@ The long-term goal is a PPSSPP plugin named `Tekken6.PPSSPP.UltrawideFix` that:
 - CWCheat-to-EBOOT mapping has been verified for the eight known 3D aspect instructions.
 - `tools/analyze_eboot.py` reproduces the ELF summary, pattern counts, and address mapping.
 - `tools/disassemble_aspect_sites.py` dumps Capstone disassembly and six-entry aspect dispatch tables.
+- `tools/find_mips_xrefs.py` scans direct `j`/`jal` references and literal 32-bit pointer words.
 - The four patched constants are case/index `0` in four aspect dispatch tables; case/index `5` loads a custom aspect from a structure field.
+- Direct xrefs found so far:
+  - `0x08945ED4`: 6 direct `j`/`jal` xrefs.
+  - `0x089466EC`: one direct `j` tail-call at `0x08956E20`.
+  - `0x08946B6C`: two direct `jal` xrefs at `0x08863CA4` and `0x08863F28`.
+  - `0x08947834`: no direct `j`/`jal` xrefs found.
 
 ## Important Hashes
 
@@ -89,6 +95,7 @@ Analysis helpers:
 - `python tools/analyze_eboot.py`
 - Install disassembly dependency with `python -m pip install -r requirements.txt`.
 - `python tools/disassemble_aspect_sites.py --before 0x40 --after 0x80`
+- `python tools/find_mips_xrefs.py 0x08945ED4 0x089466EC 0x08946B6C 0x08947834`
 
 No `dist/` output exists yet.
 
@@ -96,8 +103,8 @@ No `dist/` output exists yet.
 
 The initial checkpoint is pushed and `tools/analyze_eboot.py` exists. Next:
 
-1. Disassemble meaningful windows around the four sites with a MIPS-capable disassembler.
-2. Identify callers and stronger function boundaries for the four aspect dispatches.
+1. Inspect callers around direct xrefs, especially `0x0894B2FC`, `0x0894BCB0`, `0x0894C69C`, `0x0894CB1C`, `0x08955268`, `0x08955440`, `0x08956E20`, `0x08863CA4`, and `0x08863F28`.
+2. Identify indirect callers or table owners for the larger `0x08947834` projection-like function.
 3. Derive relocation-stable byte signatures around each patch site.
 4. Only then study plugin architecture and safe runtime patching.
 
