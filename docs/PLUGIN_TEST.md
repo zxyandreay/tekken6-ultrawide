@@ -1,18 +1,16 @@
-# Tekken 6 PPSSPP Ultrawide Fix — v0.4 beta test guide
+# Tekken 6 PPSSPP Ultrawide Fix — v0.5 beta test guide
 
 Last updated: 2026-09-03
 
 ## What this build tests
 
-v0.3 established a visually working PRX baseline for the known-good 3D ultrawide patch by reproducing PPSSPP CWCheat's invalidate-before-write behavior.
+v0.5 preserves the validated 3D and camera behavior, reduces repeated PPSSPP JIT/cache churn, and enables one narrowly scoped HUD/UI experiment in the supplied INI.
 
-v0.4 keeps that validated 3D path and adds the project's known gameplay-camera adjustment directly to the PRX.
-
-HUD/UI/menu correction is still intentionally disabled.
+The HUD experiment is not considered finished. It redirects only three traced UI initializer callsites and changes their logical canvas width after the game's original initializer runs.
 
 ## Install
 
-Replace the entire previous plugin folder with the v0.4 package so these files exist:
+Replace the entire previous plugin folder with the v0.5 package:
 
 ```text
 PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
@@ -21,11 +19,9 @@ PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
 └── plugin.ini
 ```
 
-Supported game:
+Supported game: `ULUS10466`.
 
-```text
-ULUS10466
-```
+Disable any older Tekken 6 widescreen/ultrawide CWCheat that changes the same 3D aspect or camera addresses, fully close PPSSPP, then cold boot the game.
 
 ## Supplied configuration
 
@@ -37,111 +33,114 @@ Enable3D = 1
 EnableCamera = 1
 CameraPreset = 2
 
+EnableHUDExperimental = 1
+
 PatchIntervalMs = 77
 DebugLogging = 0
 ```
 
-Camera presets:
+At 20:9, the experimental UI descriptors use a logical width of 600 instead of 480 while retaining the original logical height of 272.
 
-```text
-0 = Original        0x3F80
-1 = Slightly Wider  0x3F81
-2 = Wider           0x3F82   (v0.4 default)
-3 = Widest          0x3F83
-```
+## First test: baseline regression check
 
-## PPSSPP test conditions
+With `EnableHUDExperimental = 1`:
 
-1. Disable the existing Tekken 6 ultrawide/widescreen CWCheat.
-2. Keep PPSSPP Display Layout = `Stretch` for comparison with the established development baseline.
-3. Ensure plugins are enabled for Tekken 6.
-4. Fully close PPSSPP.
-5. Cold boot the game and enter a fight.
-6. Confirm character proportions and horizontal field of view still match the successful v0.3 result.
-7. Confirm the gameplay camera is visibly wider than the original camera.
+1. Use the same PPSSPP Display Layout (`Stretch`) as the established development baseline.
+2. Enter a fight and confirm character proportions and horizontal field of view still match v0.4.
+3. Confirm `CameraPreset = 2` still gives the expected Wider camera.
+4. Check the fight HUD and at least one menu/pause screen.
 
-## Camera A/B test
+If 3D or camera changed, report that separately from HUD behavior because v0.5 does not intentionally change their addresses or values.
 
-To verify that the camera patch is independently controlled by the plugin, keep all settings unchanged and test these values one at a time with a cold boot between tests:
+## HUD A/B test
+
+Test the same screens twice with a full PPSSPP restart between runs.
+
+Run A:
 
 ```ini
-CameraPreset = 0
-CameraPreset = 1
-CameraPreset = 2
-CameraPreset = 3
+EnableHUDExperimental = 1
 ```
 
-Expected order from narrowest to widest:
-
-```text
-Original < Slightly Wider < Wider < Widest
-```
-
-The v0.4 default is `CameraPreset = 2`.
-
-## Disable camera without disabling ultrawide
-
-Use:
+Run B:
 
 ```ini
-EnableCamera = 0
+EnableHUDExperimental = 0
 ```
 
-The 3D 20:9 aspect correction should remain active while the gameplay camera returns to its original behavior.
+Compare:
+
+- health bars and fight HUD,
+- character select,
+- pause UI,
+- result screens,
+- prompts and overlays,
+- full-screen 2D backgrounds/panels.
+
+If the experimental hook improves one family but breaks another, record the exact screens. Do not compensate with additional global cheats during this comparison.
+
+## Replacement-texture A/B test
+
+If you use a PPSSPP replacement texture pack, keep the pack itself unchanged and repeat the HUD A/B test.
+
+Report whether a replacement texture:
+
+- works with both settings,
+- disappears only when `EnableHUDExperimental = 1`,
+- disappears with both settings,
+- changes only on a specific screen.
+
+v0.5 does not intentionally change texture data or replacement keys. The runtime maintenance change merely avoids invalidating/re-writing already healthy JIT blocks every polling cycle.
+
+## Emergency fallback
+
+If a menu/HUD path becomes unusable, use:
+
+```ini
+EnableHUDExperimental = 0
+```
+
+The 3D ultrawide and camera fixes remain enabled.
+
+## Camera controls
+
+```text
+CameraPreset = 0   Original
+CameraPreset = 1   Slightly Wider
+CameraPreset = 2   Wider (default)
+CameraPreset = 3   Widest
+```
 
 ## Diagnostic logging
 
-Verbose logging is off by default for the public beta.
-
-If troubleshooting, change:
-
-```ini
-DebugLogging = 0
-```
-
-to:
+Change:
 
 ```ini
 DebugLogging = 1
 ```
 
-Then fully restart PPSSPP and reproduce the issue.
+and fully restart PPSSPP. The log is:
+
+```text
+PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log
+```
 
 Expected header:
 
 ```text
-=== Tekken6.PPSSPP.UltrawideFix v0.4 ===
+=== Tekken6.PPSSPP.UltrawideFix v0.5 ===
 Plugin module_start reached successfully
 ```
 
-A successful initial cycle should include messages equivalent to:
+A successful first pass can log messages equivalent to:
 
 ```text
-3D: first CWCheat-order cycle patched all four sites
-Camera: first CWCheat-order cycle patched the camera site
+3D: initial low-churn cycle installed all four sites
+Camera: initial low-churn cycle installed the camera site
+HUD: installed all three targeted experimental UI hooks
 ```
 
-The camera site is:
-
-```text
-0x0895350C
-```
-
-and the default v0.4 target word is:
-
-```text
-0x3C013F82
-```
-
-## Important PPSSPP JIT note
-
-PPSSPP may place internal `0x68xxxxxx` emuhack markers into guest code when JIT blocks are compiled. These are not Tekken restoring the original instruction.
-
-The plugin deliberately invalidates each relevant code range before inspecting/writing it, preserving the behavior that made v0.3 successful.
-
-## What to report
-
-For a useful v0.4 test report, include:
+## Useful report format
 
 ```text
 PPSSPP version:
@@ -149,19 +148,14 @@ Platform/device:
 Display aspect ratio:
 ForceAspectRatio:
 CameraPreset:
+EnableHUDExperimental:
+Replacement texture pack: none / name
 3D aspect: correct / incorrect
-Camera: original / slightly wider / wider / widest / no visible change
-HUD/UI: note any unexpected regression
+Camera: correct / incorrect
+Fight HUD: improved / same / worse
+Menus/pause: improved / same / worse
+Replacement textures: working / missing / mixed
+Specific affected screens:
 ```
 
-If `DebugLogging = 1`, also include:
-
-```text
-PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log
-```
-
-Screenshots from the same fight/camera position are especially useful when comparing camera presets.
-
-## HUD status
-
-No HUD/UI/menu correction is active in v0.4. If HUD elements remain stretched or incorrectly positioned on ultrawide displays, that is a known limitation rather than a failed v0.4 camera/3D installation.
+Screenshots of the same screen with the HUD option on and off are especially useful.

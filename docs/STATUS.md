@@ -2,98 +2,77 @@
 
 Last updated: 2026-09-03
 
-## Current Phase
+## Current phase
 
-Phase 7: v0.4 public beta — preserve the validated v0.3 3D runtime foundation, integrate the known wider camera patch, and continue targeted HUD/UI reverse engineering.
+Phase 8: v0.5 beta — keep the validated 3D/camera baseline, reduce repeated PPSSPP JIT invalidation, and device-test a narrowly scoped UI logical-canvas hook.
 
-## What is verified
+## Verified baseline
 
-- Tekken 6 USA `ULUS10466`.
-- `ULUS10466_EBOOT.BIN` is a decrypted 32-bit little-endian MIPS ELF suitable for static analysis.
-- The known-good 20:9 CWCheat visually fixes the 3D view on the user's POCO F5 when PPSSPP Display Layout is set to Stretch.
-- The four exact CWCheat/runtime aspect sites are:
+- Supported game: Tekken 6 USA `ULUS10466`.
+- The known-good 20:9 CWCheat visually fixes the 3D view on the development device when PPSSPP Display Layout is set to Stretch.
+- Four exact 3D runtime sites remain unchanged:
   - `0x08945F10`
   - `0x08946794`
   - `0x08946BC8`
   - `0x08947D90`
-- Original instruction pair at each site:
+- Original aspect pair at each site:
   - `0x3C013FE3`
   - `0x34218E39`
-- Exact 20:9 pair:
-  - `0x3C01400E`
-  - `0x342138E4`
-- v0.3's invalidate-before-write PRX approach was visually tested successfully and is now the validated 3D plugin baseline.
-- The documented gameplay-camera instruction is at `0x0895350C`:
-  - Original: `0x3C013F80`
-  - Slightly Wider: `0x3C013F81`
-  - Wider: `0x3C013F82`
-  - Widest: `0x3C013F83`
-- Generic orthographic Paths A/B/C were user-tested visible no-ops for HUD/UI/menu screens.
-- The Warriors Fusion Fix uses separate 3D aspect and HUD-scale hooks; Tekken still needs its actual HUD-scale equivalent identified.
+- Camera site remains `0x0895350C` with presets `0x3F80` through `0x3F83`.
+- v0.3's invalidate-before-write method was visually validated and is the known-good PRX/JIT foundation.
 
-## v0.1 result
+## v0.5 runtime maintenance
 
-FAILED/UNVERIFIED. Both 3D and HUD appeared stretched. It used fixed addresses and mixed HUD experiments into the first PRX test.
+v0.3/v0.4 invalidated and rewrote the target guest-code ranges on every poll. v0.5 keeps invalidate-before-write for initial installation or real restoration, but does not disturb a healthy target instruction or the expected PPSSPP `0x68xxxxxx` emuhack state on every subsequent 77 ms poll.
 
-## v0.2 result
+This preserves the proven JIT-safe installation method while reducing unnecessary code-cache churn. It does not alter texture bytes or replacement-texture identities.
 
-The v0.2 log proved the PRX loaded and wrote the correct four 3D aspect sites. It also exposed PPSSPP's `0x68xxxxxx` JIT/emuhack block markers. Those markers were initially mistaken for game-side code reversion.
+## HUD/UI research result
 
-See `docs/PLUGIN_V02_LOG_ANALYSIS.md`.
+The project still rejects a broad global 480x272 projection patch. Three earlier generic orthographic candidates were disproven by runtime testing.
 
-## v0.3 result
+Focused tracing of candidate #2 established:
 
-SUCCESSFUL 3D BASELINE.
+- coordinate/set helper: `0x08A39158`
+- initializer B: `0x08A392F0`
+- follow-up float/property helper: `0x08A39808`
+- initializer B creates a 2D descriptor with `+0x28 = 480.0` and `+0x2C = 272.0`.
+- `+0x30` and `+0x34` initialize to `1.0`, but a whole-executable scan did not identify a safe candidate-#2-specific setter that could be promoted as a HUD X/Y scale hook.
+- `+0x4C` is broadly referenced (117 generic COP1 hits in the earlier scan) and is now treated as unsafe; the surrounding 1.0 fields make color/alpha state a more plausible interpretation than a dedicated HUD scale.
 
-v0.3 changed the ordering to mirror PPSSPP CWCheat more closely:
+## v0.5 experimental HUD hook
 
-1. `sceKernelIcacheInvalidateRange()` first,
-2. inspect the restored guest instruction,
-3. write the requested aspect pair,
-4. `sceKernelDcacheWritebackRange()`,
-5. repeat continuously at a configurable cadence (default 77 ms).
+Only three external calls to initializer B are redirected:
 
-The user tested the resulting plugin and confirmed that it worked. This closes the PRX/JIT foundation question and allows development to move forward from a known-good plugin baseline.
+- `0x089A92D8`
+- `0x089AB3A4`
+- `0x089AD87C`
 
-## v0.4 implementation
+Their traces show the target descriptor pointer is already supplied in `$a0`. The plugin hook:
 
-v0.4 keeps the validated v0.3 3D path and adds the known camera adjustment using the same invalidate-before-write discipline.
+1. calls the original `0x08A392F0` initializer,
+2. preserves its integer return value,
+3. changes only descriptor field `+0x28`,
+4. leaves `+0x2C` and all other descriptor fields untouched.
 
-Default package:
+The logical width is calculated as:
 
-```ini
-[MAIN]
-ForceAspectRatio = 20:9
-Enable3D = 1
-
-EnableCamera = 1
-CameraPreset = 2
-
-PatchIntervalMs = 77
-DebugLogging = 0
+```text
+480 * targetAspect / (16/9)
 ```
 
-`CameraPreset = 2` is the project's previously documented **Wider** value (`0x3F82`). The camera can be disabled independently or changed between Original / Slightly Wider / Wider / Widest without rebuilding the PRX.
+At 20:9 this is 600, yielding a targeted `600x272` logical canvas for only those three caller paths.
 
-v0.4 is labeled beta because the combined PRX camera integration is new even though the underlying camera address/value research and the v0.3 3D foundation are established.
+This is an **experimental device-test path**, not a completed HUD fix. It can be disabled with:
 
-## HUD/UI research status
+```ini
+EnableHUDExperimental = 0
+```
 
-HUD correction remains disabled in v0.4.
+## Immediate test matrix
 
-The project's current evidence says not to patch generic 480×272 projection constants globally. Focused CI tracing instead highlighted:
-
-- descriptor/render family around `0x08A391xx`–`0x08A39Axx`,
-- coordinate/set helper `0x08A39158`,
-- initializer `0x08A392F0`,
-- follow-up float/property helper `0x08A39808`.
-
-The suspected `+0x4C` structure field is not safe to patch globally: static analysis found it used broadly across the executable. Future work must identify a callsite-specific or subsystem-specific HUD scale/coordinate path before enabling any UI patch in a release.
-
-## Immediate next steps
-
-1. Device-test v0.4 with `CameraPreset = 2` and confirm the combined PRX produces the same wider camera behavior as the known cheat/INI value.
-2. Test `CameraPreset = 0`, `1`, and `3` to confirm the plugin switch behaves independently of the 3D aspect fix.
-3. Continue tracing the `0x08A39808` caller families and descriptor ownership to isolate battle HUD/menu callsites.
-4. Keep overlays, health bars, menus, and general 2D projection experiments separated until a dedicated hook is proven.
-5. Only after a safe HUD hook is validated should it become enabled by default in a future release.
+1. Confirm 3D proportions and camera still match v0.4 with the experimental HUD option both on and off.
+2. Check fight HUD, character select, pause/menu screens, result screens, prompts, and full-screen overlays.
+3. Test any replacement texture pack on the same screens with `EnableHUDExperimental = 1` and `0`.
+4. If only one UI family regresses, document that screen rather than broadening the patch globally.
+5. Keep `+0x4C` and the disproven generic orthographic paths out of runtime code unless new evidence overturns the current trace.
