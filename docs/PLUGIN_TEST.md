@@ -1,20 +1,24 @@
-# Tekken 6 PPSSPP Ultrawide Fix — v0.2 runtime diagnostic
+# Tekken 6 PPSSPP Ultrawide Fix — v0.3 CWCheat-order diagnostic
 
 Last updated: 2026-09-03
 
 ## Why this build exists
 
-The first PRX build did **not** reproduce the user's known-good CWCheat result: both 3D and HUD/UI still appeared stretched with `HUDMode` off and on.
+The v0.2 PRX definitely loaded, found the correct live Tekken module, found the same four addresses used by the working CWCheat, and initially wrote the exact 20:9 instruction pairs successfully. However, the user's 3D view still looked stretched.
 
-Therefore v0.2 removes the HUD experiment from the test path and answers one question first:
+The uploaded v0.2 log also exposed a PPSSPP-specific detail: the first patched instruction later became `0x6806F70C`. This is not Tekken restoring the original aspect code. PPSSPP reserves `0x68000000` opcodes as JIT/emuhack markers placed into guest code at compiled block starts.
 
-> Is PPSSPP actually starting the PRX, and are the exact four known-good Tekken 6 aspect instructions being found, written, read back, and kept active in the live game module?
+PPSSPP's own CWCheat engine invalidates JIT/instruction-cache state **before** reading or writing a cheat code address. v0.2 wrote first and invalidated afterward.
 
-Do not use v0.2 to evaluate HUD correction. HUD work resumes only after this test proves the PRX 3D path.
+v0.3 therefore answers one narrower question:
+
+> If the PRX mirrors PPSSPP CWCheat's invalidation-before-write ordering and continuously reapplies the four known-good aspect writes at approximately the same cadence, does the 3D view finally match the known-good CWCheat?
+
+HUD correction is still intentionally disabled.
 
 ## Install
 
-Extract the package into the active PPSSPP memstick root so these files exist:
+Replace the entire previous plugin folder with the v0.3 package so these files exist:
 
 ```text
 PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
@@ -23,146 +27,111 @@ PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
 └── plugin.ini
 ```
 
-The manifest supports:
+Supported game:
 
 ```text
 ULUS10466
 ```
 
-only.
-
-## Configuration
-
-Use the supplied INI unchanged:
+## Supplied configuration
 
 ```ini
 [MAIN]
 ForceAspectRatio = 20:9
 Enable3D = 1
+PatchIntervalMs = 77
 DebugLogging = 1
 ```
 
+`PatchIntervalMs = 77` intentionally approximates PPSSPP's default CWCheat refresh interval for this diagnostic build.
+
 ## PPSSPP test conditions
 
-1. Disable the old Tekken 6 widescreen CWCheat.
+1. Disable the existing Tekken 6 ultrawide CWCheat.
 2. Keep PPSSPP Display Layout = `Stretch`.
-3. Make sure PPSSPP plugins are enabled for the game.
-4. Fully close Tekken 6 / PPSSPP before the test.
-5. For this diagnostic, do **not** manually load a savestate.
-6. If PPSSPP is configured to auto-load a savestate, disable that for this test.
-7. Launch Tekken 6 normally.
+3. Ensure `Enable plugins` is enabled for Tekken 6.
+4. Fully close PPSSPP.
+5. Do not manually load an old savestate for the first test.
+6. Launch Tekken 6 normally and enter a fight.
+7. Compare character proportions and visible horizontal field of view against the known-good CWCheat result.
 
-PPSSPP should normally display a short `Loaded plugin: ...` message when a PRX plugin starts successfully.
-
-## What v0.2 does differently
-
-### Fresh startup marker
-
-At the start of `module_start`, it deletes the prior log and immediately creates a new log containing:
+## Expected log header
 
 ```text
-=== Tekken6.PPSSPP.UltrawideFix v0.2 runtime diagnostic ===
+=== Tekken6.PPSSPP.UltrawideFix v0.3 CWCheat-order diagnostic ===
 Plugin module_start reached successfully
 ```
 
-If a fresh log with this header does not appear, stop. The plugin is not starting and no Tekken rendering conclusion should be drawn.
+The plugin first invalidates each exact aspect site so PPSSPP can restore any JIT/emuhack first opcode before it inspects the code.
 
-### Live module discovery
-
-The PRX enumerates PSP modules and logs their names, text addresses, and text sizes.
-
-It searches live module text for the exact verified layout of the four Tekken aspect case-0 instruction pairs.
-
-The verified relative spacing is:
+The initial restored words should be the original pair:
 
 ```text
-site 1 +0x0000
-site 2 +0x0884
-site 3 +0x0CB8
-site 4 +0x1E80
+0x3C013FE3 0x34218E39
 ```
 
-Original pair:
+Then the patch thread should report four writes using the 20:9 pair:
 
 ```text
-0x3C013FE3
-0x34218E39
-```
-
-20:9 pair:
-
-```text
-0x3C01400E
-0x342138E4
-```
-
-### Exact write/readback
-
-For every accepted site, v0.2 writes the 20:9 pair, flushes the corresponding data-cache range, invalidates the exact PPSSPP/JIT instruction range, and immediately reads both instructions back.
-
-A fully successful runtime patch should include four lines resembling:
-
-```text
-3D patched/readback: 0x........ = 0x3C01400E 0x342138E4
+0x3C01400E 0x342138E4
 ```
 
 followed by:
 
 ```text
-3D: all four sites patched and immediate readback verified
+3D: first CWCheat-order cycle patched all four sites
 ```
 
-### Early-boot monitor
+## Important: do not interpret 0x68xxxxxx as a Tekken code reversion
 
-The plugin checks the sites for roughly three seconds after startup.
+PPSSPP can replace the first guest instruction of a compiled JIT block with an internal `0x68xxxxxx` emuhack marker. The v0.2 monitor treated this as a failure; that interpretation was wrong.
 
-If something restores or changes the code, the log will contain:
+v0.3 does not attempt to verify correctness by expecting literal patched opcodes to remain visible at all times. Instead, before each repeated write it asks PPSSPP to invalidate the relevant code range first, matching CWCheat's ordering more closely.
 
-```text
-3D monitor: patch was reverted/changed; reapplying
+## If 20:9 still looks unchanged
+
+Do one exaggerated diagnostic without changing the PRX:
+
+Edit:
+
+```ini
+ForceAspectRatio = 20:9
 ```
 
-If the target instructions remain stable, the end should contain:
+to:
 
-```text
-3D monitor: target instructions remained present through early boot
+```ini
+ForceAspectRatio = 4:1
 ```
+
+Fully close PPSSPP and launch Tekken again.
+
+A 4:1 projection value should create an unmistakably different 3D view if these four live code sites are actually governing the active rendering path under PRX-side patching.
+
+### Result interpretation
+
+- **20:9 works:** PRX foundation is proven. Resume HUD-scale research.
+- **20:9 seems uncertain, but 4:1 visibly changes the 3D view:** PRX patching works; the remaining issue is choosing the correct compensation/aspect behavior, not plugin loading.
+- **Even 4:1 produces no visible change while the log says all four sites are patched:** stop emulating CWCheat writes. Move to a true Warriors-style runtime hook that forces the aspect value at the live perspective projection input (`$f12`) or the active call sites.
 
 ## What to send back
 
-After the test, send this file:
+After the v0.3 test, send:
 
 ```text
 PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
 Tekken6.PPSSPP.UltrawideFix.log
 ```
 
-Also say whether the 3D scene now visually matches the known-good CWCheat.
+and state:
 
-## How the result will be interpreted
+```text
+20:9: changed / unchanged
+4:1: changed / unchanged   (only if 20:9 remains uncertain)
+```
 
-### A. No fresh log exists
+A gameplay screenshot for each tested ratio is useful but optional.
 
-The PRX never started. Investigate active memstick path, PPSSPP plugin setting, DISC_ID matching, or load failure.
+## HUD status
 
-### B. Log starts, but no four-site signature is found
-
-The live runtime executable/module layout differs from what the static EBOOT analysis predicted, or the main module is not visible when expected. The logged module list and known-address pre-scan values will tell us which.
-
-### C. Four writes succeed, then are reverted
-
-Startup ordering, state loading, or another runtime action is undoing the patch. The monitor will prove it rather than leaving us to guess.
-
-### D. Four writes/readbacks succeed and remain stable, but 3D still looks stretched
-
-This is a deeper PPSSPP/runtime issue. The next step is to compare the PRX code-write/JIT path against PPSSPP's CWCheat implementation and verify which projection path is actually executing.
-
-### E. 3D finally matches the CWCheat
-
-The PRX runtime foundation is proven. Then resume the real goal: identify and implement Tekken's separate HUD-scale path analogous to The Warriors Fusion Fix.
-
-## HUD note
-
-There is intentionally no `HUDMode` in the v0.2 package INI.
-
-The previous Group A/B paths remain research hypotheses, not a working HUD fix. Testing them before the PRX 3D path is verified would mix two different problems and produce ambiguous results.
+No HUD fix is active in v0.3. HUD work resumes only after a PRX can produce a visually confirmed 3D aspect change.
