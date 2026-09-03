@@ -4,7 +4,7 @@ Last updated: 2026-09-03
 
 ## Current Phase
 
-Phase 1: baseline repository setup and executable verification.
+Phase 3: mapping the existing working 3D patch.
 
 ## Completed
 
@@ -17,14 +17,17 @@ Phase 1: baseline repository setup and executable verification.
 - Computed SHA-256 hashes for the ISO, EBOOT, and INI.
 - Verified `ULUS10466_EBOOT.BIN` is a 32-bit little-endian MIPS ELF executable, not encrypted `~PSP` data.
 - Added `.gitignore` rules to protect disc images and temporary extracted assets.
+- Pushed the initial baseline checkpoint to `origin/main` at `f720d0157face81618f9b818e3d763977e55a6ae`.
+- Verified the CWCheat-to-EBOOT mapping for all eight known 3D aspect instruction writes.
+- Added `tools/analyze_eboot.py` for repeatable ELF header inspection and known aspect address mapping.
 
 ## Current Blocker
 
-None for baseline setup. Deeper reverse engineering must wait until the initial baseline checkpoint is committed and pushed.
+None. Next work is MIPS disassembly around the four verified aspect pairs.
 
 ## Current Experimental Status
 
-No plugin or runtime patching experiment has been started in this repository.
+No plugin or runtime patching experiment has been started in this repository. Static address mapping has begun.
 
 ## Last Known-Good Behavior
 

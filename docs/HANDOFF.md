@@ -4,7 +4,7 @@ Last updated: 2026-09-03
 
 ## Current Objective
 
-Complete the initial baseline checkpoint for `tekken6-ultrawide`, then proceed to careful reverse engineering of Tekken 6 USA (`ULUS10466`) rendering paths.
+Continue careful reverse engineering of Tekken 6 USA (`ULUS10466`) rendering paths. The initial baseline checkpoint has been pushed; the current active research thread is mapping the known 3D aspect patch sites.
 
 The long-term goal is a PPSSPP plugin named `Tekken6.PPSSPP.UltrawideFix` that:
 
@@ -29,6 +29,9 @@ The long-term goal is a PPSSPP plugin named `Tekken6.PPSSPP.UltrawideFix` that:
   - memory size `0x0045F02C`
   - flags `0x00000007`
 - No section headers are present, so function names/sections should not be expected from ordinary ELF section data.
+- Initial baseline checkpoint pushed to `origin/main` at `f720d0157face81618f9b818e3d763977e55a6ae`.
+- CWCheat-to-EBOOT mapping has been verified for the eight known 3D aspect instructions.
+- `tools/analyze_eboot.py` reproduces the ELF summary, pattern counts, and address mapping.
 
 ## Important Hashes
 
@@ -38,16 +41,16 @@ The long-term goal is a PPSSPP plugin named `Tekken6.PPSSPP.UltrawideFix` that:
 
 ## Known Addresses
 
-Known 20:9 3D CWCheat write pairs:
+Known 20:9 3D CWCheat write pairs, with verified EBOOT file offsets:
 
-- `0x20145F10` -> `0x3C01400E`
-- `0x20145F14` -> `0x342138E4`
-- `0x20146794` -> `0x3C01400E`
-- `0x20146798` -> `0x342138E4`
-- `0x20146BC8` -> `0x3C01400E`
-- `0x20146BCC` -> `0x342138E4`
-- `0x20147D90` -> `0x3C01400E`
-- `0x20147D94` -> `0x342138E4`
+- `0x20145F10` runtime `0x08945F10`, file `0x00142F10` -> `0x3C01400E`
+- `0x20145F14` runtime `0x08945F14`, file `0x00142F14` -> `0x342138E4`
+- `0x20146794` runtime `0x08946794`, file `0x00143794` -> `0x3C01400E`
+- `0x20146798` runtime `0x08946798`, file `0x00143798` -> `0x342138E4`
+- `0x20146BC8` runtime `0x08946BC8`, file `0x00143BC8` -> `0x3C01400E`
+- `0x20146BCC` runtime `0x08946BCC`, file `0x00143BCC` -> `0x342138E4`
+- `0x20147D90` runtime `0x08947D90`, file `0x00144D90` -> `0x3C01400E`
+- `0x20147D94` runtime `0x08947D94`, file `0x00144D94` -> `0x342138E4`
 
 Known restore/original 3D write pairs:
 
@@ -66,8 +69,6 @@ Optional camera site, not initial plugin scope:
 
 ## Still Uncertain
 
-- Exact CWCheat-to-PSP-runtime-address mapping.
-- Exact runtime-address-to-EBOOT-file-offset mapping for the known aspect sites.
 - Containing functions for the four 3D aspect patch sites.
 - Why four locations are required.
 - Whether the four locations represent different projection modes, different callers, or different copies of related setup code.
@@ -84,13 +85,12 @@ No `dist/` output exists yet.
 
 ## Next Recommended Experiment
 
-After the initial checkpoint is pushed:
+The initial checkpoint is pushed and `tools/analyze_eboot.py` exists. Next:
 
-1. Add a small analysis tool that parses the ELF load segment and translates candidate PSP runtime addresses to file offsets.
-2. Verify the four known CWCheat aspect patch sites by reading the original instructions from `ULUS10466_EBOOT.BIN`.
-3. Disassemble meaningful windows around the four sites with a MIPS-capable disassembler.
-4. Document verified mappings and surrounding instructions in `docs/ADDRESS_MAP.md`.
-5. Only then study pattern signatures and plugin architecture.
+1. Disassemble meaningful windows around the four sites with a MIPS-capable disassembler.
+2. Document surrounding instructions and likely function boundaries in `docs/ADDRESS_MAP.md`.
+3. Derive relocation-stable byte signatures around each patch site.
+4. Only then study pattern signatures and plugin architecture.
 
 ## Known Dead Ends
 
@@ -104,4 +104,4 @@ No visual claims are proven until the user tests in PPSSPP. Use `docs/TEST_PLAN.
 
 ## Last Pushed Commit
 
-Pending initial checkpoint.
+Initial baseline checkpoint: `f720d0157face81618f9b818e3d763977e55a6ae`.
