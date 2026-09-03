@@ -10,8 +10,9 @@ on:
       - 'tools/trace_native_2d_path.py'
       - 'docs/PLUGIN_TEST.md'
       - 'docs/STATUS.md'
+      - 'docs/HUD_RESEARCH.md'
       - 'README.md'
-      - 'RELEASE_v0.5.md'
+      - 'RELEASE_v0.6.md'
       - '.github/workflows/build-plugin.yml'
 
 permissions:
@@ -33,7 +34,7 @@ jobs:
       - name: Install analysis dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Trace HUD and camera candidates
+      - name: Trace rendering candidates
         run: |
           python tools/trace_hud_candidates.py \
             --eboot ULUS10466_EBOOT.BIN \
@@ -82,7 +83,7 @@ jobs:
           cp plugin/package/Tekken6.PPSSPP.UltrawideFix.ini "$DEST/"
           cp docs/PLUGIN_TEST.md dist/TESTING.md
           cp README.md dist/README.md
-          cp RELEASE_v0.5.md dist/RELEASE_NOTES.md
+          cp RELEASE_v0.6.md dist/RELEASE_NOTES.md
           find dist -maxdepth 5 -type f -print
 
       - name: Upload plugin package
@@ -102,7 +103,7 @@ jobs:
           if-no-files-found: warn
 
   release:
-    if: "github.event_name == 'push' && github.event.head_commit.message == 'release: v0.5'"
+    if: "github.event_name == 'push' && github.event.head_commit.message == 'release: v0.6'"
     needs:
       - analyze
       - build
@@ -122,17 +123,17 @@ jobs:
         run: |
           set -eu
           cd release-dist
-          zip -r ../Tekken6-PPSSPP-UltrawideFix-v0.5.zip .
+          zip -r ../Tekken6-PPSSPP-UltrawideFix-v0.6.zip .
 
-      - name: Publish v0.5
+      - name: Publish v0.6
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          gh release create v0.5 \
+          gh release create v0.6 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "Tekken 6 PPSSPP Ultrawide Fix v0.5" \
-            --notes-file RELEASE_v0.5.md \
+            --title "Tekken 6 PPSSPP Ultrawide Fix v0.6" \
+            --notes-file RELEASE_v0.6.md \
             --latest \
-            Tekken6-PPSSPP-UltrawideFix-v0.5.zip
+            Tekken6-PPSSPP-UltrawideFix-v0.6.zip

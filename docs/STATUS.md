@@ -4,75 +4,80 @@ Last updated: 2026-09-03
 
 ## Current phase
 
-Phase 8: v0.5 beta — keep the validated 3D/camera baseline, reduce repeated PPSSPP JIT invalidation, and device-test a narrowly scoped UI logical-canvas hook.
+Phase 9: v0.6 beta — restore normal Tekken/PPSSPP memory behavior, retire the failed v0.5 HUD descriptor experiment, and test a single native-PSP flat-layer viewport transform while preserving the validated ultrawide 3D/camera baseline.
 
-## Verified baseline
+## Validated baseline retained
 
-- Supported game: Tekken 6 USA `ULUS10466`.
-- The known-good 20:9 CWCheat visually fixes the 3D view on the development device when PPSSPP Display Layout is set to Stretch.
-- Four exact 3D runtime sites remain unchanged:
+- Game: Tekken 6 USA `ULUS10466`.
+- 3D aspect sites:
   - `0x08945F10`
   - `0x08946794`
   - `0x08946BC8`
   - `0x08947D90`
-- Original aspect pair at each site:
-  - `0x3C013FE3`
-  - `0x34218E39`
-- Camera site remains `0x0895350C` with presets `0x3F80` through `0x3F83`.
-- v0.3's invalidate-before-write method was visually validated and is the known-good PRX/JIT foundation.
+- Camera site: `0x0895350C`.
+- User-validated baseline: 20:9 3D correction + Wider camera (`0x3F82`) with PPSSPP Display Layout = Stretch.
+- Low-churn PPSSPP JIT maintenance remains in place.
 
-## v0.5 runtime maintenance
+## Texture/memory correction
 
-v0.3/v0.4 invalidated and rewrote the target guest-code ranges on every poll. v0.5 keeps invalidate-before-write for initial installation or real restoration, but does not disturb a healthy target instruction or the expected PPSSPP `0x68xxxxxx` emuhack state on every subsequent 77 ms poll.
+The previous manifest had `memory = 93`. PPSSPP uses the plugin memory field to increase emulated game RAM, so the plugin was changing Tekken's memory environment even though the PRX does not require extended RAM.
 
-This preserves the proven JIT-safe installation method while reducing unnecessary code-cache churn. It does not alter texture bytes or replacement-texture identities.
+v0.6 removes the `memory` key entirely. This is the primary plugin-side correction for the selective replacement-texture fallback reported in UI/menu screens.
 
-## HUD/UI research result
+Runtime confirmation is still required; CI can only confirm package contents and build behavior.
 
-The project still rejects a broad global 480x272 projection patch. Three earlier generic orthographic candidates were disproven by runtime testing.
+## Re-established 2D requirement
 
-Focused tracing of candidate #2 established:
+The target is not individual HUD repositioning.
 
-- coordinate/set helper: `0x08A39158`
-- initializer B: `0x08A392F0`
-- follow-up float/property helper: `0x08A39808`
-- initializer B creates a 2D descriptor with `+0x28 = 480.0` and `+0x2C = 272.0`.
-- `+0x30` and `+0x34` initialize to `1.0`, but a whole-executable scan did not identify a safe candidate-#2-specific setter that could be promoted as a HUD X/Y scale hook.
-- `+0x4C` is broadly referenced (117 generic COP1 hits in the earlier scan) and is now treated as unsafe; the surrounding 1.0 fields make color/alpha state a more plausible interpretation than a dedicated HUD scale.
-
-## v0.5 experimental HUD hook
-
-Only three external calls to initializer B are redirected:
-
-- `0x089A92D8`
-- `0x089AB3A4`
-- `0x089AD87C`
-
-Their traces show the target descriptor pointer is already supplied in `$a0`. The plugin hook:
-
-1. calls the original `0x08A392F0` initializer,
-2. preserves its integer return value,
-3. changes only descriptor field `+0x28`,
-4. leaves `+0x2C` and all other descriptor fields untouched.
-
-The logical width is calculated as:
+Desired architecture:
 
 ```text
-480 * targetAspect / (16/9)
+3D scene -> ultrawide
+flat UI/HUD/menu layer -> original Tekken PSP coordinates and 480:272 proportions,
+                          centered inside the ultrawide output
 ```
 
-At 20:9 this is 600, yielding a targeted `600x272` logical canvas for only those three caller paths.
+The exact PSP frame aspect is `480/272`, not exact 16:9.
 
-This is an **experimental device-test path**, not a completed HUD fix. It can be disabled with:
+For target aspect `A`:
 
-```ini
-EnableHUDExperimental = 0
+```text
+safeScale = (480/272) / A
 ```
 
-## Immediate test matrix
+At 20:9:
 
-1. Confirm 3D proportions and camera still match v0.4 with the experimental HUD option both on and off.
-2. Check fight HUD, character select, pause/menu screens, result screens, prompts, and full-screen overlays.
-3. Test any replacement texture pack on the same screens with `EnableHUDExperimental = 1` and `0`.
-4. If only one UI family regresses, document that screen rather than broadening the patch globally.
-5. Keep `+0x4C` and the disproven generic orthographic paths out of runtime code unless new evidence overturns the current trace.
+```text
+safeScale = 27/34 = 0.794117647...
+```
+
+## Retired v0.5 experiment
+
+The v0.5 hook at initializer `0x08A392F0`, which changed descriptor `+0x28`, is removed. User testing proved it did not correct the battle HUD.
+
+The three generic orthographic 480x272 paths A/B/C remain rejected because isolated runtime tests produced no visible HUD/UI/menu change.
+
+## v0.6 native 2D viewport path
+
+New static tracing followed the previously unexplained `0x08AC5BA8` route and established:
+
+- `0x08AC5BA8` is a thin wrapper forwarding to `0x08AC63AC`.
+- `0x08AC63AC` constructs a viewport transform from six floating-point bounds.
+- The live call at `0x08864B88` occurs in a surface/flat render owner around `0x08864ADC`.
+- That surrounding path directly uses the viewport routine but has no direct perspective or generic-orthographic builder marker.
+- Separate calls to the broad viewport family were classified around known perspective and orthographic setup functions; therefore the shared viewport builder itself is not patched globally.
+
+v0.6 redirects only `0x08864B88` through `plugin/safe_area.S`.
+
+The wrapper receives the original viewport, reduces only its width by `safeScale`, and adds half the removed width to X. Y, height, near/far, and every game-authored HUD/menu coordinate remain unchanged.
+
+Status: **strong static candidate / new device-test implementation**, not yet visually validated.
+
+## Immediate validation
+
+1. Cold boot v0.6 with the same HD texture pack used in v0.4/v0.5.
+2. Confirm previously missing custom pause/menu/prompt textures load again.
+3. Confirm 3D proportions and Wider camera match v0.4.
+4. Confirm battle HUD, prompts, menus, pause UI, character/stage select, and results are no longer horizontally stretched.
+5. Compare `EnableNative2DSafeArea = 1` vs `0` if any flat screen behaves unexpectedly.

@@ -1,41 +1,40 @@
 # Tekken 6 PPSSPP Ultrawide Fix
 
-A fan-made PPSSPP plugin and reverse-engineering project for **Tekken 6 (USA, ULUS10466)** focused on proper ultrawide 3D rendering, camera tuning, and targeted HUD/UI correction.
+A fan-made PPSSPP plugin and reverse-engineering project for **Tekken 6 USA (`ULUS10466`)**.
 
-> **Current release:** v0.5 beta  
-> **Supported game:** Tekken 6 USA — `ULUS10466`  
-> **Primary target:** PPSSPP on modern widescreen / ultrawide Android devices
+> **Current release:** v0.6 beta  
+> **Primary target:** 20:9 Android devices such as the POCO F5  
+> **Development display mode:** PPSSPP Display Layout = `Stretch`
 
-This project is not affiliated with or endorsed by Bandai Namco Entertainment, Sony, or the PPSSPP project. You must provide your own legally obtained copy of Tekken 6.
+The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. Use your own legally obtained copy of Tekken 6.
 
-## What v0.5 does
+## v0.6 design
 
-- Keeps the visually validated v0.3/v0.4 3D ultrawide runtime foundation.
-- Defaults to **20:9**.
-- Keeps the configurable gameplay-camera fix, with **Wider** as the default preset.
-- Retains PPSSPP JIT-safe invalidate-before-write installation.
-- Reduces repeated JIT/cache churn by no longer invalidating and rewriting already healthy patched blocks every maintenance poll.
-- Adds a **targeted experimental HUD/UI logical-canvas hook** at only three traced external initializer callsites.
-- Leaves the earlier disproven global 480x272 projection experiments disabled.
+v0.6 deliberately separates the game into two presentation goals:
+
+```text
+3D world        -> true ultrawide aspect + wider camera
+flat 2D layer   -> native PSP 480:272 proportions, centered, not stretched
+```
+
+The 2D fix is **not** an element-by-element HUD repositioning system. Tekken keeps its original HUD/menu coordinates and layout. The plugin only changes how the complete flat viewport is mapped before PPSSPP performs its final Stretch.
 
 ## Current status
 
 | Area | Status |
 | --- | --- |
-| 3D ultrawide aspect | ✅ Working / validated baseline |
-| 20:9 target | ✅ Implemented |
-| Wider gameplay camera | ✅ Implemented |
+| 3D ultrawide aspect | ✅ Validated baseline |
+| 20:9 | ✅ Implemented |
+| Wider gameplay camera | ✅ Validated baseline |
 | Camera presets | ✅ Configurable |
-| PPSSPP JIT-safe runtime patching | ✅ Implemented |
-| Low-churn JIT maintenance | ✅ New in v0.5 |
-| HUD/UI logical-canvas hook | 🧪 Experimental in v0.5 |
-| General HUD/menu correction | 🧪 Not yet considered complete |
+| Low-churn PPSSPP JIT maintenance | ✅ Implemented |
+| Forced 93 MB plugin memory override | ✅ Removed in v0.6 |
+| Native PSP 2D safe-area viewport | 🧪 New in v0.6; device validation required |
 | Other Tekken 6 regions | ❌ Not supported yet |
 
 ## Installation
 
-1. Download the latest release ZIP.
-2. Extract it into the active PPSSPP memory-stick directory so this folder exists:
+Extract the release ZIP into the active PPSSPP memory-stick location so you have:
 
 ```text
 PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
@@ -44,13 +43,16 @@ PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
 └── plugin.ini
 ```
 
-3. Make sure PPSSPP plugins are enabled for Tekken 6.
-4. Disable older Tekken 6 widescreen/ultrawide CWCheats that change the same aspect or camera addresses.
-5. Fully restart PPSSPP and launch Tekken 6 normally.
+Then:
 
-The development baseline uses PPSSPP Display Layout = **Stretch**, with the plugin correcting the game-side 3D projection.
+1. Enable PPSSPP plugins for Tekken 6.
+2. Disable older Tekken 6 CWCheats that change the same aspect/camera addresses.
+3. Use PPSSPP Display Layout = `Stretch` for the established 20:9 development setup.
+4. Fully close PPSSPP and cold boot Tekken 6.
 
-## Default v0.5 configuration
+A full restart matters for v0.6 because the plugin manifest no longer forces extended emulated RAM.
+
+## Default configuration
 
 ```ini
 [MAIN]
@@ -60,36 +62,24 @@ Enable3D = 1
 EnableCamera = 1
 CameraPreset = 2
 
-EnableHUDExperimental = 1
+EnableNative2DSafeArea = 1
 
 PatchIntervalMs = 77
 DebugLogging = 0
 ```
 
-The packaged beta enables the experimental HUD path so it can be tested immediately. The PRX's built-in fallback keeps that option disabled if the INI is missing.
+### Camera presets
 
-If a menu or HUD screen regresses, set:
-
-```ini
-EnableHUDExperimental = 0
-```
-
-and fully restart PPSSPP. The 3D and camera fixes remain active.
-
-## Camera presets
-
-| `CameraPreset` | Result | Patched value |
+| Value | Result | Word |
 | ---: | --- | --- |
 | `0` | Original | `0x3F80` |
 | `1` | Slightly Wider | `0x3F81` |
 | `2` | **Wider — default** | `0x3F82` |
 | `3` | Widest | `0x3F83` |
 
-The camera instruction is at runtime address `0x0895350C`. The original instruction is `lui $at, 0x3F80`; preset 2 changes it to `lui $at, 0x3F82`.
+## 3D foundation
 
-## 3D runtime foundation
-
-The four established 3D aspect sites are:
+The known-good Tekken 6 aspect fix uses four runtime sites:
 
 ```text
 0x08945F10
@@ -98,119 +88,136 @@ The four established 3D aspect sites are:
 0x08947D90
 ```
 
-PPSSPP can replace the first guest instruction of a compiled block with an internal `0x68xxxxxx` emuhack marker. The successful v0.3 plugin fixed the earlier PRX failure by following the same important order used by PPSSPP's CWCheat path:
-
-1. invalidate the relevant instruction/JIT range,
-2. inspect the restored guest instruction,
-3. apply the target instruction,
-4. write back the data cache.
-
-v0.5 keeps that behavior when a patch actually needs installation. Once the requested code is healthy, maintenance polls leave the target/emuhack state alone instead of repeatedly forcing the block back through invalidation.
-
-## Experimental HUD/UI path
-
-Earlier runtime tests ruled out three generic 480x272 orthographic/projection candidates because they were too broad and could affect unrelated 2D elements.
-
-Focused static tracing later identified a 2D descriptor family around `0x08A391xx–0x08A39Axx`. Initializer `0x08A392F0` builds a descriptor with:
+The gameplay camera site is:
 
 ```text
-+0x28 = 480.0   logical width
-+0x2C = 272.0   logical height
+0x0895350C
 ```
 
-v0.5 redirects only these three external calls to that initializer:
+These addresses and their validated v0.4 behavior are intentionally unchanged by v0.6.
+
+PPSSPP JIT can replace guest-code block starts with internal `0x68xxxxxx` emuhack markers. The plugin installs code changes with invalidate-before-write behavior and then uses low-churn maintenance rather than repeatedly invalidating healthy blocks.
+
+## Native PSP 2D safe area
+
+### Requirement
+
+The objective is to keep all ordinary flat graphics in their **native PSP presentation** while the 3D scene fills the ultrawide display:
+
+- health bars,
+- names and timer,
+- button prompts,
+- menus,
+- character/stage select,
+- pause/results/options UI,
+- ordinary flat backgrounds and overlays.
+
+Tekken's original authored positions are not individually modified.
+
+### Why the earlier v0.5 approach was removed
+
+v0.5 experimented with changing a logical-width field in three calls to initializer `0x08A392F0`. Device testing showed the battle HUD remained stretched, proving that descriptor was not the required common HUD presentation path.
+
+That hook is removed in v0.6.
+
+### v0.6 viewport path
+
+Static tracing identified runtime call `0x08864B88` as a live flat/surface viewport path. Unlike Tekken's validated perspective setup and the three previously tested generic orthographic paths, the surrounding function has no direct perspective or orthographic builder call.
+
+The original game arrives at the viewport routine with:
 
 ```text
-0x089A92D8
-0x089AB3A4
-0x089AD87C
+f12 = X
+f13 = Y
+f14 = width
+f15 = height
+f16 = near
+f17 = far
 ```
 
-The hook calls the original initializer first, preserves its return value, then changes only `+0x28` to an aspect-derived logical width:
+v0.6 redirects only that call through `safe_area.S`, which applies:
 
 ```text
-480 * targetAspect / (16/9)
+nativePSPAspect = 480 / 272
+safeScale       = nativePSPAspect / targetAspect
+safeWidth       = width * safeScale
+safeX           = x + (width - safeWidth) / 2
 ```
 
-At 20:9, the experimental width is **600**, producing a `600x272` logical canvas for those three paths.
+Y, height, depth, and all Tekken-authored UI coordinates are untouched.
 
-This is intentionally described as an **experiment**, not a finished universal HUD fix. It needs screen-by-screen device validation.
+For 20:9:
 
-## Why `+0x4C` is not patched
+```text
+safeScale = (480/272) / (20/9)
+          = 27/34
+          ≈ 0.794117647
+```
 
-Earlier research considered descriptor field `+0x4C`. A later whole-executable scan found 117 generic COP1 references at that offset, and the initializer sets a run of fields (`+0x40`, `+0x44`, `+0x48`, `+0x4C`) to `1.0`. That makes color/alpha-style state more plausible than a dedicated HUD horizontal-scale control.
+This is intended to inverse-compensate the horizontal part of PPSSPP Stretch for the flat layer only.
 
-v0.5 therefore does **not** patch `+0x4C`, and it does not invent a global `+0x30/+0x34` scale hook either.
-
-## Replacement texture packs
-
-The plugin does not edit texture image data or PPSSPP texture-replacement definitions. v0.5's compatibility change is on the code/JIT side: it avoids needless repeated invalidation of already healthy guest-code blocks.
-
-For a useful replacement-texture test, compare the same screen with:
+Disable the new path without disabling 3D/camera using:
 
 ```ini
-EnableHUDExperimental = 1
+EnableNative2DSafeArea = 0
 ```
 
-and:
+## Replacement textures and memory
+
+v0.4/v0.5 packages declared:
 
 ```ini
-EnableHUDExperimental = 0
+memory = 93
 ```
 
-If a replacement disappears only when the experimental HUD path is enabled, report that exact screen/texture. That gives the project a concrete renderer path to isolate without broad global patches.
+in `plugin.ini`. PPSSPP uses that field to raise the game's emulated RAM size. The ultrawide PRX does not require that memory override.
 
-## Research and documentation
+v0.6 removes the field entirely. This keeps Tekken in PPSSPP's normal memory configuration and removes a major source of allocation-layout changes that can alter dynamically prepared UI texture hashes/padding and make some replacement textures fall back to originals.
 
-Useful files:
+The plugin does not modify `textures.ini`, HD texture files, or PPSSPP replacement keys.
 
-- [`docs/STATUS.md`](docs/STATUS.md) — current verified state and next tests
-- [`docs/BASELINE.md`](docs/BASELINE.md) — known-good ultrawide baseline
-- [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md) — important runtime addresses
-- [`docs/HUD_RESEARCH.md`](docs/HUD_RESEARCH.md) — HUD/UI reverse-engineering work
-- [`docs/WARRIORS_ARCHITECTURE.md`](docs/WARRIORS_ARCHITECTURE.md) — reference architecture study
-- [`docs/PLUGIN_TEST.md`](docs/PLUGIN_TEST.md) — v0.5 test procedure
-- [`docs/HANDOFF.md`](docs/HANDOFF.md) — research handoff notes
-- [`tools/trace_hud_candidates.py`](tools/trace_hud_candidates.py) — reproducible HUD trace
-- [`tools/trace_v05_candidates.py`](tools/trace_v05_candidates.py) — focused v0.5 callsite/field trace
+## Building
 
-## Building from source
-
-The plugin uses PSPDEV / PSPSDK:
+Requires PSPDEV / PSPSDK:
 
 ```bash
 make -C plugin clean all
 ```
 
-GitHub Actions builds the PRX, packages the PPSSPP plugin directory, and runs the static-analysis traces against the checked-in research EBOOT.
+The plugin now builds from:
 
-## Compatibility and limitations
+```text
+plugin/main.c
+plugin/safe_area.S
+```
 
-- Only `ULUS10466` is currently supported.
-- v0.5 is a **beta** because the targeted UI canvas path requires device validation.
-- General HUD/UI/menu correction is not yet complete.
-- Cold-boot testing is preferred while reverse engineering.
-- Do not run an old ultrawide CWCheat and the PRX against the same code addresses simultaneously.
+GitHub Actions also runs the EBOOT static-analysis traces before packaging/release.
+
+## Research files
+
+- [`docs/STATUS.md`](docs/STATUS.md)
+- [`docs/HUD_RESEARCH.md`](docs/HUD_RESEARCH.md)
+- [`docs/ADDRESS_MAP.md`](docs/ADDRESS_MAP.md)
+- [`docs/PLUGIN_TEST.md`](docs/PLUGIN_TEST.md)
+- [`docs/WARRIORS_ARCHITECTURE.md`](docs/WARRIORS_ARCHITECTURE.md)
+- [`tools/trace_native_2d_path.py`](tools/trace_native_2d_path.py)
+- [`tools/trace_hud_candidates.py`](tools/trace_hud_candidates.py)
 
 ## Release history
 
+### v0.6
+
+- Removes the forced 93 MB emulated-memory request.
+- Removes the ineffective v0.5 descriptor-width HUD hook.
+- Adds one centered native-PSP 2D viewport hook at `0x08864B88`.
+- Uses exact PSP `480:272` proportions rather than treating PSP output as exact 16:9.
+- Preserves the validated v0.4 3D and camera behavior.
+
 ### v0.5
 
-- Keeps the validated 3D and camera addresses/values unchanged.
-- Adds low-churn JIT maintenance after initial patch installation.
-- Adds `EnableHUDExperimental`.
-- Adds a caller-specific hook for three traced `0x08A392F0` UI initializer calls.
-- Uses an aspect-derived logical width (`600x272` at 20:9) only on those hooked descriptors.
-- Rejects `+0x4C` and broad 480x272 patches as unsafe targets based on the current trace.
+- Added low-churn JIT maintenance.
+- Tested a three-callsite logical-width HUD experiment; battle HUD remained stretched, so that experiment is retired in v0.6.
 
 ### v0.4
 
-- Promoted the validated v0.3 3D runtime foundation into a public beta.
-- Added the Wider camera preset (`0x3F82`) as the default.
-- Added configurable camera presets.
-- Expanded reproducible HUD/camera analysis tooling.
-
-### v0.3
-
-- First visually successful PRX baseline for the known-good ultrawide 3D patch.
-- Corrected PPSSPP JIT handling by invalidating code before inspecting/writing it.
+- Validated public baseline combining the successful 3D fix and configurable wider camera.

@@ -1,133 +1,125 @@
-# HUD Research
+# HUD / Native 2D Research
 
 Last updated: 2026-09-03
 
-## Goal
+## Clarified goal
 
-Find the highest practical level where Tekken 6 converts logical HUD, UI, or screen-space coordinates into output coordinates, so HUD/UI proportions can be preserved independently from 20:9 3D rendering.
+The project is not trying to reposition individual Tekken 6 HUD or menu elements.
 
-## Current Findings
+The desired output is two presentation layers:
 
-### VERIFIED: generic orthographic projection builder
+```text
+3D geometry -> target ultrawide aspect
+flat graphics -> original PSP-authored coordinates and 480:272 proportions,
+                 centered inside the ultrawide output
+```
 
-A generic orthographic projection builder has been identified at runtime address `0x08ACA990`.
+This means a health bar remains at the position Tekken authored, a menu item remains at its original PSP coordinate, and a button prompt keeps its original relationship to the 480x272 canvas. The correction should happen once at the flat presentation boundary.
 
-Static analysis shows that it builds a conventional orthographic matrix from six floating-point bounds:
+## Exact PSP safe-area math
 
-- X bounds: `$f12`, `$f13`
-- Y bounds: `$f14`, `$f15`
-- Z bounds: `$f16`, `$f17`
+The PSP framebuffer is `480x272`, whose aspect is:
 
-Its math uses coordinate sums/differences, scale terms equivalent to `2 / (max - min)`, and translation terms equivalent to `-(max + min) / (max - min)`.
+```text
+480 / 272 = 30 / 17 = 1.764705882...
+```
 
-This is separate from the perspective projection builder at `0x08ACA6C4` used by the known 3D aspect paths.
+For a target display/game aspect `A` under PPSSPP Stretch:
 
-### VERIFIED: three direct 480x272 orthographic setup paths
+```text
+safeScale = (480/272) / A
+```
 
-Exactly three direct `jal` calls to `0x08ACA990` were identified in the file-backed game executable:
+At 20:9:
 
-| Path | Right-X `480.0` load | Ortho call | Matrix-combine call | Evidence |
-| --- | --- | --- | --- | --- |
-| A | `0x08863230` | `0x08863258` | `0x0886327C` -> `0x08ACAB14` | Builds X `0..480`, Y `272..0` |
-| B | `0x088634A0` | `0x088634E4` | `0x088634F4` -> `0x08ACAB14` | Builds X `0..480`, Y `272..0` |
-| C | `0x08864494` | `0x088644B8` | `0x088644D4` -> `0x08ACAB14` | Builds X `0..480`, Y `272..0` |
+```text
+safeScale = (30/17) / (20/9)
+          = 27/34
+          = 0.794117647...
+```
 
-All three therefore establish a PSP-native 480x272 logical 2D projection.
+A viewport implementation therefore uses:
 
-`tools/analyze_projection_paths.py` reproduces the direct perspective/ortho call scan and verifies the three original `480.0` instructions.
+```text
+safeWidth = originalWidth * safeScale
+safeX     = originalX + (originalWidth - safeWidth) / 2
+```
 
-### VERIFIED USER TEST: isolated A/B/C tests produced no visible HUD/UI/menu change
+No Y/height change is required.
 
-On the target POCO F5 with PPSSPP Stretch and the known-good 20:9 3D patch enabled, the user tested `Diag - Ortho Path A 600-wide`, `Path B`, and `Path C` independently.
+## Rejected paths
 
-Observed result:
+### Generic orthographic A/B/C
 
-- Path A: no visible change in HUD/UI/menus.
-- Path B: no visible change in HUD/UI/menus.
-- Path C: no visible change in HUD/UI/menus.
+The three direct 480x272 calls to `0x08ACA990` remain negative runtime results:
 
-This is an important negative result. A `480 -> 600` horizontal orthographic change should be visually obvious if the tested visible UI is actively rendered through that projection path. Therefore the three direct `0x08ACA990` call sites should **not** be treated as the primary live HUD/UI path for the tested screens.
+- A: `0x08863258`
+- B: `0x088634E4`
+- C: `0x088644B8`
 
-Possible explanations still to distinguish:
+Changing their 480-wide bounds produced no visible HUD/UI/menu change on the target device. They are not the primary live flat path for the tested screens.
 
-1. the three paths are used by other rendering categories not visited during the test,
-2. they are initialization/utility/dead paths for normal fight/menu rendering,
-3. Tekken's visible HUD uses pre-transformed/sprite geometry or a different matrix path,
-4. a later transform overrides/neutralizes these matrices.
+### v0.5 descriptor-width hook
 
-The next research phase should therefore pivot away from A/B/C and search more broadly for the live screen-space/sprite coordinate path.
+v0.5 redirected three calls to initializer `0x08A392F0` and changed descriptor field `+0x28` from 480 to an aspect-derived width.
 
-### STRONG EVIDENCE: why the previous global HUD experiment broke overlays
+User testing showed the battle HUD remained stretched. That experiment is removed in v0.6.
 
-A centered 16:9 safe area inside a 20:9 output has a virtual width of 600 logical units:
+## Viewport research
 
-- `480 * (20 / 16) = 600`
-- centered around original X center `240` gives bounds `[-60, 540]`
+The previously unexplained path around `0x08864B74` calls `0x08AC5BA8`.
 
-Earlier experiments changed broad 2D rendering behavior using this kind of safe-area math. The math itself can preserve ordinary 16:9 HUD proportions after a 20:9 final stretch.
+New tracing established that:
 
-However, a full-screen quad still authored from X `0..480` then occupies only the central 480 units of a 600-unit projection. This remains a useful explanation for the historical symptom where a dark pause overlay/fade stopped covering the full screen: ordinary HUD and full-screen overlays cannot necessarily receive the same treatment.
+```text
+0x08AC5BA8 -> thin wrapper -> 0x08AC63AC
+```
 
-The new no-op A/B/C result means those three specific orthographic paths are not sufficient to explain the historical overlay behavior; another 2D/sprite path must still be identified.
+`0x08AC63AC` consumes six floating values and constructs the viewport transform. Its math contains the expected half-width/half-height/depth midpoint operations and stores the original six viewport values.
 
-### REJECTED as a first-line HUD target: `0x08864B74` path
+The shared viewport builder itself cannot be patched globally because it is also reached by broader render setup.
 
-A previous broad safe-area experiment also modified code around `0x08864B74`. Static disassembly shows that this path does **not** call the orthographic builder `0x08ACA990`; it calls a different routine at `0x08AC5BA8`.
+### Broad 480x272 viewport family
 
-It should not be included in a new HUD fix without separate evidence, but the distinct `0x08AC5BA8` path is now worth analyzing as a possible screen-space/sprite transform family because A/B/C did not affect visible UI.
+`0x08946390` selects full/left/right viewport modes and is called from both perspective-associated and orthographic-associated setup paths. It is therefore not a valid global 2D hook.
 
-## Superseded Diagnostic Strategy
+The call graph includes caller regions classified with perspective markers and separate regions classified with orthographic markers.
 
-`diagnostics/ULUS10466_ORTHO_PATH_TEST.ini` remains in the repository as a reproducible negative test artifact. It changes only the right X bound from `480.0` to `600.0` for one path at a time:
+### Live flat/surface path
 
-- Path A: CWCheat `0x20063230`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
-- Path B: CWCheat `0x200634A0`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
-- Path C: CWCheat `0x20064494`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
+Runtime `0x08864B88` calls the viewport wrapper from the surface/render function around `0x08864ADC`.
 
-The test has now served its purpose: none of the three paths visibly changed the tested HUD/UI/menu groups.
+Its immediate owner:
 
-Do not spend further user time repeating A/B/C unless a newly identified screen specifically points back to one of them.
+- obtains current render-surface width/height,
+- sets a full viewport,
+- directly calls the viewport wrapper,
+- has no direct call to the perspective builder `0x08ACA6C4`,
+- has no direct call to the generic orthographic builder `0x08ACA990`.
 
-## New Static-Analysis Direction
+Earlier broad experiments in this area visibly affected flat overlays, unlike the A/B/C no-op tests. Under the clarified project requirement, that is positive evidence that this is a real flat presentation path rather than a reason to manipulate individual sprites.
 
-Use `tools/find_screen_space_candidates.py` to scan the decrypted EBOOT for likely PSP logical screen constants and nearby code/call structure.
+## v0.6 implementation
 
-It searches for code/data related to:
+Only the `jal` at `0x08864B88` is redirected.
 
-- `480.0`, `272.0`
-- `240.0`, `136.0`
-- `512.0`, `320.0`
-- `256.0`, `160.0`
-- corresponding small integer immediates
+The MIPS wrapper in `plugin/safe_area.S` receives Tekken's already prepared viewport registers:
 
-The report is intentionally broad. Every hit remains a candidate until caller/use analysis shows that it belongs to live HUD/UI rendering.
+```text
+f12 = x
+f13 = y
+f14 = width
+f15 = height
+f16 = near
+f17 = far
+```
 
-Special attention should now go to:
+It changes only `f12` and `f14` using the centered safe-area formula, then calls the original `0x08AC5BA8` routine.
 
-- sprite batching / pre-transformed vertices,
-- screen-coordinate conversion functions,
-- matrix path around `0x08AC5BA8`,
-- functions that are shared by health bars, text, and menu panels but not necessarily by full-screen overlays.
+No HUD object positions, sizes, health-bar values, text coordinates, menu descriptors, texture coordinates, or orthographic projection constants are patched.
 
-## Important Prior Negative Result
+## Important validation condition
 
-User-provided historical result:
+The static evidence is strong enough for a beta implementation, but only device testing can prove that this viewport owns all intended battle/menu flat elements without affecting a 3D pass.
 
-- Previous sprite-level or individual 2D element experiments caused regressions including dark pause overlay issues, incorrect or empty health-bar fills, blocky graphical corruption, and inconsistent UI behavior.
-
-Status: STRONG EVIDENCE that broad per-sprite manipulation is the wrong first strategy.
-
-## Candidate Categories To Separate
-
-- Gameplay HUD: health bars, names, timer, round indicators, rage indicators.
-- Menus: title, character select, stage select, options, pause menu, results.
-- Full-screen overlays: pause darkening, fades, screen effects.
-- Pre-rendered/video elements.
-
-## Research Rules
-
-- Do not globally shrink all 2D rendering.
-- Do not patch every occurrence of a coordinate or aspect constant.
-- Trace usage before patching.
-- Keep full-screen overlays distinct from ordinary HUD where evidence supports separate paths.
-- Preserve the known-good 3D-only configuration as the safe baseline.
+If the 3D world itself is compressed when `EnableNative2DSafeArea = 1`, the path must be reclassified and disabled; do not compensate by widening individual UI objects.
