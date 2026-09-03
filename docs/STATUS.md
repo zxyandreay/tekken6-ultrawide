@@ -4,95 +4,100 @@ Last updated: 2026-09-03
 
 ## Current Phase
 
-Phase 6A: first PPSSPP PRX implementation and controlled HUD classification testing.
+Phase 6B: diagnose why the first PPSSPP PRX build did not reproduce the already-known working 3D CWCheat before doing any further HUD experimentation.
 
-The project has moved from static-only HUD research to a real plugin build. The 3D aspect component is based on the already user-verified ULUS10466 aspect patch. The HUD portion remains experimental and is intentionally split into isolated candidate groups so testing can classify which live 2D path owns ordinary HUD versus masks/overlays.
+## User-verified result of plugin v0.1
 
-## Completed
+Target:
 
-- Verified `ULUS10466_EBOOT.BIN` as a decrypted 32-bit little-endian MIPS ELF suitable for static analysis.
-- Verified all four known 3D aspect-dispatch patch sites and tied them to perspective/camera projection.
-- Preserved the known-good 20:9 CWCheat baseline.
-- Identified generic perspective builder `0x08ACA6C4` and generic orthographic builder `0x08ACA990`.
-- User tested three direct 480x272 orthographic paths A/B/C; all were visible no-ops for the tested HUD/UI/menu screens.
-- Added broader screen-space and Warriors-style candidate analysis tools.
-- Ranked two stronger live 2D/render-state candidate families:
-  - Group A around `0x08A3916C–0x08A396D8`.
-  - Group B around `0x08AA62D8–0x08AA655C`, currently suspected to be mask-like.
-- Added `docs/WARRIORS_ARCHITECTURE.md` documenting the separate 3D-aspect and HUD-scale architecture used by The Warriors Fusion Fix.
-- Added a self-contained PSP PRX implementation under `plugin/`.
-- Added PPSSPP manifest/config packaging for `ULUS10466` only.
-- Added a GitHub Actions PSPSDK build using `pspdev/pspdev:latest`.
-- Fixed the initial PSPSDK cache-invalidation compile issue.
-- **GitHub Actions run 2 completed successfully and produced a packaged PRX artifact.**
+- Tekken 6 USA `ULUS10466`
+- POCO F5 2400x1080 / 20:9
+- PPSSPP Display Layout = Stretch
 
-## Plugin Behavior
+Result:
 
-### Verified 3D path
+- `HUDMode = 0`: both 3D and HUD/UI still appeared horizontally stretched.
+- `HUDMode = 1`: both 3D and HUD/UI still appeared horizontally stretched.
 
-The plugin patches these four ULUS10466 locations at runtime:
+This means v0.1 did **not** prove that its runtime writes reached/remained in the live Tekken executable. The previously stated confidence in the PRX 3D path was therefore too high. The static EBOOT/CWCheat mapping remains verified, but the first PRX runtime implementation is now classified as FAILED/UNVERIFIED.
 
-- `0x08945F10`
-- `0x08946794`
-- `0x08946BC8`
-- `0x08947D90`
+## What remains verified
 
-Before writing, it verifies that each location still contains the expected `lui at,...` + `ori at,at,...` instruction shape. The default test config uses exact `20:9` for the POCO F5.
+- `ULUS10466_EBOOT.BIN` is a decrypted 32-bit little-endian MIPS ELF suitable for static analysis.
+- The known-good CWCheat maps to four exact aspect case-0 instruction pairs in the EBOOT.
+- The four verified runtime addresses for the tested ULUS10466 build are:
+  - `0x08945F10`
+  - `0x08946794`
+  - `0x08946BC8`
+  - `0x08947D90`
+- Original pair at every site:
+  - `0x3C013FE3`
+  - `0x34218E39`
+- Exact POCO F5 20:9 pair:
+  - `0x3C01400E`
+  - `0x342138E4`
+- The known CWCheat visually fixes the 3D view when enabled.
+- Generic orthographic Paths A/B/C were user-tested no-ops for visible HUD/UI/menus.
+- The Warriors Fusion Fix architecture uses separate live 3D-aspect and HUD-scale paths; Tekken still needs its actual HUD-scale equivalent identified.
 
-### Experimental HUD path
+## v0.1 implementation weaknesses now acknowledged
 
-`HUDMode = 1` patches three 480.0 LUI loads in candidate Group A to 600.0:
+Compared with The Warriors architecture, v0.1:
 
-- `0x08A39288`
-- `0x08A392F4`
-- `0x08A39360`
+- used fixed absolute game-code addresses,
+- did not identify the live Tekken module,
+- did not pattern/signature-scan the live module text,
+- did not prove post-write instruction persistence during early boot,
+- mixed unverified HUD candidates into the first plugin test before the PRX 3D path had been independently proven.
 
-`HUDMode = 2` isolates Group B:
+See `docs/PLUGIN_V01_FAILURE_ANALYSIS.md`.
 
-- `0x08AA6314`
-- `0x08AA63B8`
-- `0x08AA64C0`
+## v0.2 diagnostic plugin
 
-`HUDMode = 3` applies both groups.
+The source has been revised to isolate and prove the runtime 3D path first.
 
-These HUD writes are guarded by opcode/value checks. They are not yet considered a final HUD fix.
+v0.2 now:
 
-## Current Reliability Statement
+1. creates a fresh log immediately when `module_start` is reached,
+2. enumerates loaded PSP modules with `sceKernelGetModuleIdList`,
+3. logs module names/text addresses/text sizes,
+4. scans executable text for the verified four-site aspect signature using relative offsets:
+   - `+0x0000`
+   - `+0x0884`
+   - `+0x0CB8`
+   - `+0x1E80`
+5. uses the fixed ULUS10466 addresses only as a four-site signature-checked fallback,
+6. writes the requested aspect only after verification,
+7. uses `sceKernelDcacheWritebackRange` + `sceKernelIcacheInvalidateRange` for each 8-byte code pair,
+8. immediately reads each pair back and logs the exact values,
+9. verifies/reapplies the four pairs during the first few seconds of boot to expose early reversion/load-order problems.
 
-- **3D aspect:** high confidence for this exact ULUS10466 executable because it reproduces the known-good user-tested patch and verifies instruction signatures before writing.
-- **HUD/UI:** experimental. The current repository findings are sufficient for a controlled plugin test, not sufficient to claim Warriors-level HUD reliability yet.
+HUD correction is deliberately disabled in this build. It will not resume until v0.2 proves that the PRX itself reproduces the known-good 3D patch.
 
-## Current Build
+## Required next user test
 
-Successful workflow:
+Use the newly built v0.2 package with:
 
-- Workflow: `Build PPSSPP plugin`
-- Run: `2`
-- Commit: `10ea8db60763bb293f65694cf0c5a5bf3337d215`
-- Artifact: `Tekken6-PPSSPP-UltrawideFix`
-
-Package contents:
-
-```text
-PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
-├── Tekken6.PPSSPP.UltrawideFix.prx
-├── Tekken6.PPSSPP.UltrawideFix.ini
-└── plugin.ini
-TESTING.md
+```ini
+[MAIN]
+ForceAspectRatio = 20:9
+Enable3D = 1
+DebugLogging = 1
 ```
 
-## Required User Test Order
+Requirements:
 
-1. Disable the old Tekken 6 widescreen CWCheat.
-2. Keep PPSSPP Display Layout = Stretch.
-3. Test `HUDMode = 0` first to verify the PRX reproduces the known-good 20:9 3D view.
-4. Test `HUDMode = 1` and record changes to health bars, timer, names, menus, pause screen, and fades.
-5. Test `HUDMode = 2` separately to classify the mask-like path.
-6. Only test `HUDMode = 3` if Groups A and B show complementary behavior.
-7. Send the generated plugin log after any mismatch or unexpected result.
+- disable the Tekken CWCheat for the test,
+- PPSSPP Stretch,
+- cold boot the game,
+- do not manually load a savestate and disable auto-load savestate for this diagnostic if enabled.
 
-Detailed instructions are in `docs/PLUGIN_TEST.md`.
+After launch, send:
 
-## Next Development Step
+```text
+PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log
+```
 
-Use the user's PPSSPP results to classify Group A and Group B. If Group A controls ordinary HUD while Group B owns masks/overlays, replace the diagnostic `HUDMode` system with a proper caller/context-aware `FixHUD` implementation. If neither group affects the visible HUD, reject them and continue tracing higher-level screen-space descriptor/caller paths rather than returning to the already rejected generic orthographic paths.
+If that fresh log does not exist, diagnose PPSSPP plugin loading/install location/settings rather than Tekken rendering.
+
+If the log shows all four target pairs present and stable but the 3D view is still stretched, then the next investigation must compare the PRX runtime/JIT behavior against PPSSPP's CWCheat invalidation path rather than guessing at HUD code.
