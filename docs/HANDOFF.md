@@ -4,138 +4,190 @@ Last updated: 2026-09-03
 
 ## Current Objective
 
-Validate the first real PPSSPP PRX for Tekken 6 USA (`ULUS10466`) on the target POCO F5, then use the results to convert the experimental HUD candidate modes into a proper Warriors-style HUD fix.
+Prove why the first Tekken 6 PPSSPP PRX did not reproduce the already-known working 20:9 CWCheat on the user's POCO F5, then resume HUD research only after the PRX 3D path is proven.
 
-The 3D side is already tied to the known-good 20:9 CWCheat. The unresolved question is still HUD ownership: which live 2D/render-state path controls ordinary HUD, and which path controls masks/overlays.
+## Latest user result
 
-## Verified So Far
+The user tested the first plugin build with both `HUDMode = 0` and `HUDMode = 1`.
 
-### Input and executable
+Observed:
 
-- `ULUS10466_EBOOT.BIN` is a decrypted 32-bit little-endian MIPS ELF executable.
-- Load segment:
-  - file offset `0x00001018`
-  - virtual address `0x08804018`
-  - file size `0x003F62A8`
-  - memory size `0x0045F02C`
-- Known-good CWCheat 3D ultrawide behavior has already been validated by the user on a POCO F5.
+- 3D remained horizontally stretched in both cases.
+- HUD/UI remained horizontally stretched in both cases.
 
-### 3D aspect system
+This invalidates the earlier assumption that the first PRX 3D path was already runtime-proven. Treat plugin v0.1 as FAILED/UNVERIFIED.
 
-Verified runtime aspect-dispatch patch sites:
+The static analysis remains valid: the existing CWCheat is still the known-good visual baseline.
+
+## Verified 3D baseline
+
+Game:
+
+- Tekken 6 USA
+- Disc ID `ULUS10466`
+
+Known-good CWCheat 20:9 writes:
+
+- `0x20145F10 -> 0x3C01400E`
+- `0x20145F14 -> 0x342138E4`
+- `0x20146794 -> 0x3C01400E`
+- `0x20146798 -> 0x342138E4`
+- `0x20146BC8 -> 0x3C01400E`
+- `0x20146BCC -> 0x342138E4`
+- `0x20147D90 -> 0x3C01400E`
+- `0x20147D94 -> 0x342138E4`
+
+Mapped runtime pair starts:
 
 - `0x08945F10`
 - `0x08946794`
 - `0x08946BC8`
 - `0x08947D90`
 
-Each site is a `lui at,...` + `ori at,at,...` pair that constructs the aspect float used by the working 3D patch.
+Relative layout from first site:
 
-Perspective projection builder: `0x08ACA6C4`.
+- `+0x0000`
+- `+0x0884`
+- `+0x0CB8`
+- `+0x1E80`
 
-### Rejected generic HUD hypothesis
-
-Generic orthographic builder: `0x08ACA990`.
-
-Three direct 480x272 setup paths A/B/C were changed independently from 480 to 600 and produced no visible HUD/UI/menu change in user testing. Do not return to those as the primary HUD solution.
-
-### Warriors reference
-
-The Warriors PPSSPP Fusion Fix uses two distinct runtime corrections:
-
-1. one game/perspective aspect injection,
-2. one separate HUD-scale injection.
-
-This is the architecture to emulate, not a single global 2D projection change.
-
-See `docs/WARRIORS_ARCHITECTURE.md`.
-
-## Current Plugin
-
-Source:
+Original pair at all four sites:
 
 ```text
-plugin/main.c
-plugin/Makefile
-plugin/exports.exp
-plugin/package/plugin.ini
-plugin/package/Tekken6.PPSSPP.UltrawideFix.ini
+0x3C013FE3
+0x34218E39
 ```
 
-Build workflow:
+20:9 pair:
 
 ```text
-.github/workflows/build-plugin.yml
+0x3C01400E
+0x342138E4
 ```
 
-The workflow uses `pspdev/pspdev:latest` and packages a PPSSPP-ready plugin tree.
+## Why plugin v0.1 was not sufficient
 
-### Successful build
+It compiled, but it did not establish runtime proof. Important shortcomings:
 
-- Workflow: `Build PPSSPP plugin`
-- Successful run: `2`
-- Build commit: `10ea8db60763bb293f65694cf0c5a5bf3337d215`
-- Artifact: `Tekken6-PPSSPP-UltrawideFix`
+- fixed absolute addresses rather than live module discovery/pattern scanning,
+- no log of loaded game-module text address/size,
+- no immediate exact readback of all four modified pairs,
+- no delayed verification to catch startup reversion,
+- unverified HUD writes were mixed into the first plugin test.
 
-The PRX compiles successfully with current PSPSDK.
+See `docs/PLUGIN_V01_FAILURE_ANALYSIS.md`.
 
-## Plugin Logic
+## v0.2 implementation now in repository
 
-### 3D
+`plugin/main.c` has been rewritten around a runtime verification path inspired by the important part of The Warriors architecture: locate the live game code and patch only verified signatures.
 
-`Enable3D = 1` writes the selected aspect to the four verified 3D sites after checking the expected instruction shape.
+### Startup proof
 
-Default test ratio:
+The plugin removes the previous log and immediately writes:
+
+```text
+=== Tekken6.PPSSPP.UltrawideFix v0.2 runtime diagnostic ===
+Plugin module_start reached successfully
+```
+
+If a fresh file containing this header does not exist after launch, the PRX did not start. Investigate:
+
+- wrong PPSSPP memstick folder,
+- plugins disabled for the game,
+- plugin load failure,
+- wrong/unsupported DISC_ID.
+
+### Module discovery
+
+v0.2 calls:
+
+- `sceKernelGetModuleIdList`
+- `sceKernelQueryModuleInfo`
+
+and logs module names, `text_addr`, and `text_size`.
+
+### Live four-site signature
+
+Instead of assuming a fixed module base, it searches sufficiently large loaded module text for four original/target aspect pairs at the verified relative spacing above.
+
+Only a complete four-site signature is accepted.
+
+### Safe fallback
+
+The known ULUS10466 absolute addresses remain only as a fallback. The plugin first verifies all four contain either the exact original or exact requested pair. If any one fails, no fallback write occurs.
+
+### Patch/JIT handling
+
+For each 8-byte pair:
+
+```c
+sceKernelDcacheWritebackRange(address, 8);
+sceKernelIcacheInvalidateRange(address, 8);
+```
+
+PPSSPP's current HLE implementation maps `sceKernelIcacheInvalidateRange` to deferred invalidation of the translated/JIT code range.
+
+The plugin then reads both instructions back and logs them.
+
+### Early-boot monitor
+
+A short worker checks the four sites every 250 ms for roughly three seconds. If the target pair is changed/reverted, it logs the event and reapplies the verified patch while the diagnostic thread remains alive.
+
+This exists to expose startup order/reversion issues. It is not yet intended as the final plugin architecture.
+
+## HUD status
+
+HUD correction is disabled in v0.2.
+
+Do not interpret or resume the old `HUDMode` A/B experiments until the PRX successfully reproduces the known-good 3D baseline.
+
+The long-term HUD objective remains finding Tekken's equivalent of The Warriors' separate HUD-scale operand/path. The A/B/C generic orthographic paths remain user-tested no-ops for visible HUD/UI/menus.
+
+## Next user test
+
+Use the new v0.2 artifact.
+
+Configuration:
 
 ```ini
+[MAIN]
 ForceAspectRatio = 20:9
+Enable3D = 1
+DebugLogging = 1
 ```
 
-`auto` support is implemented through PPSSPP's `kemulator:` aspect query, but fixed 20:9 is used for the first POCO F5 validation to remove another variable.
+Test conditions:
 
-### HUD experimental groups
+- old Tekken widescreen CWCheat disabled,
+- PPSSPP Display Layout = Stretch,
+- cold game boot,
+- no manual savestate load,
+- disable auto-load savestate for this diagnostic if enabled.
 
-`HUDMode = 1` tests Group A around `0x08A3916C–0x08A396D8` by changing these 480.0 LUI loads to exact 600.0:
+Then obtain:
 
-- `0x08A39288`
-- `0x08A392F4`
-- `0x08A39360`
+```text
+PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log
+```
 
-This is the recommended first HUD test because it ranked as the stronger general 2D/render-descriptor candidate.
+## How to interpret the next log
 
-`HUDMode = 2` isolates Group B around `0x08AA62D8–0x08AA655C`:
+### No fresh log
 
-- `0x08AA6314`
-- `0x08AA63B8`
-- `0x08AA64C0`
+PRX did not start. Fix plugin install/loading first.
 
-Group B currently looks more mask-like and may affect fades/overlays rather than ordinary HUD.
+### Header exists but four-site signature not found
 
-`HUDMode = 3` applies both and should not be used until the isolated tests are recorded.
+The user's live executable layout differs from the static build assumptions, or module discovery/loading is not what expected. Use logged module addresses/sizes and pre-scan known-address pairs to resolve it.
 
-## Required User Test Sequence
+### Four writes/readbacks succeed but monitor reports reversion
 
-1. Disable the existing Tekken 6 ultrawide CWCheat.
-2. Keep PPSSPP Display Layout = Stretch.
-3. Set `HUDMode = 0` and verify that the plugin alone reproduces the known-good 20:9 3D view.
-4. Set `HUDMode = 1` and check health bars, timer, names/icons, character select, pause menu, menu panels, fades and the dark pause overlay.
-5. Set `HUDMode = 2` separately and record what changes.
-6. Only use `HUDMode = 3` if Groups A and B show complementary ownership.
-7. Send `Tekken6.PPSSPP.UltrawideFix.log` after any unexpected result or signature mismatch.
+Something after `module_start` is restoring/changing the code. Investigate startup sequencing/savestate behavior.
 
-Detailed instructions: `docs/PLUGIN_TEST.md`.
+### Four writes/readbacks succeed and remain stable, but 3D is still visually stretched
 
-## Interpretation Rules
+This is the most important unexpected case. Compare PPSSPP CWCheat execution/JIT invalidation semantics with PRX writes and verify the actual active projection path/runtime code. Do not jump to HUD work.
 
-- If Group A corrects ordinary HUD proportions while overlays remain full-screen, promote Group A into the final `FixHUD` path.
-- If Group A corrects HUD but shrinks full-screen fades/overlays, keep the path but add caller/context filtering in the final PRX.
-- If Group B only changes masks/overlays, use it as a classification/exclusion signal rather than a normal HUD correction.
-- If either group causes corruption, return to `HUDMode = 0`; no persistent game data is modified.
-- If neither group changes the visible HUD, reject them and continue tracing higher-level descriptor/caller code. Do not go back to the already rejected generic orthographic paths.
+### 3D visually matches the CWCheat
 
-## Current Reliability
-
-- **3D:** high confidence for this exact ULUS10466 executable.
-- **HUD:** controlled experiment only; not yet equivalent in reliability to The Warriors Fusion Fix.
-
-The next useful development input is the user's visual classification of `HUDMode 0`, `1`, and `2`, plus the plugin log.
+The plugin loader/3D path is proven. Resume Warriors-style HUD-scale tracing from the static candidate research.
