@@ -4,71 +4,95 @@ Last updated: 2026-09-03
 
 ## Current Phase
 
-Phase 5B: the first isolated orthographic-path hypothesis has been tested and rejected for the visible HUD/UI/menus. Research now pivots to the live screen-space/sprite coordinate path.
+Phase 6A: first PPSSPP PRX implementation and controlled HUD classification testing.
+
+The project has moved from static-only HUD research to a real plugin build. The 3D aspect component is based on the already user-verified ULUS10466 aspect patch. The HUD portion remains experimental and is intentionally split into isolated candidate groups so testing can classify which live 2D path owns ordinary HUD versus masks/overlays.
 
 ## Completed
 
-- Inspected the local project directory and initialized the research repository on `main`.
-- Configured `origin` as `https://github.com/zxyandreay/tekken6-ultrawide.git`.
-- Read `ULUS10466.ini` and documented the known-good cheat baseline.
-- Computed SHA-256 hashes for the ISO, EBOOT, and INI.
-- Verified `ULUS10466_EBOOT.BIN` is a 32-bit little-endian MIPS ELF executable, not encrypted `~PSP` data.
-- Added `.gitignore` rules protecting disc images and temporary extracted assets.
-- Verified the CWCheat-to-EBOOT mapping for all eight known 3D aspect instruction writes.
-- Added repeatable ELF, disassembly, and MIPS xref analysis helpers.
-- Documented the four six-entry aspect dispatch tables.
-- Identified generic perspective projection builder `0x08ACA6C4` and four direct callers.
-- Tied aspect dispatches 1-3 directly to perspective/camera projection setup.
-- Identified generic orthographic projection builder `0x08ACA990`.
-- Identified exactly three direct 480x272 orthographic setup paths at calls `0x08863258`, `0x088634E4`, and `0x088644B8`.
-- Verified right-X `480.0` loads at `0x08863230`, `0x088634A0`, and `0x08864494`.
-- Added `tools/analyze_projection_paths.py` and isolated diagnostic INI.
-- User tested Path A, B, and C independently on the POCO F5 with 20:9 + Stretch.
-- **All three A/B/C tests produced no visible change in HUD/UI/menus.**
-- Recorded A/B/C as a reproducible negative result rather than continuing blind ortho experiments.
-- Added `tools/find_screen_space_candidates.py` to scan for broader PSP logical-coordinate code around 480/272, centers, and 512x320-style virtual dimensions.
-- Kept `0x08864B74 -> 0x08AC5BA8` out of the first ortho solution but promoted the distinct `0x08AC5BA8` family for renewed static analysis now that A/B/C did not affect visible UI.
+- Verified `ULUS10466_EBOOT.BIN` as a decrypted 32-bit little-endian MIPS ELF suitable for static analysis.
+- Verified all four known 3D aspect-dispatch patch sites and tied them to perspective/camera projection.
+- Preserved the known-good 20:9 CWCheat baseline.
+- Identified generic perspective builder `0x08ACA6C4` and generic orthographic builder `0x08ACA990`.
+- User tested three direct 480x272 orthographic paths A/B/C; all were visible no-ops for the tested HUD/UI/menu screens.
+- Added broader screen-space and Warriors-style candidate analysis tools.
+- Ranked two stronger live 2D/render-state candidate families:
+  - Group A around `0x08A3916C–0x08A396D8`.
+  - Group B around `0x08AA62D8–0x08AA655C`, currently suspected to be mask-like.
+- Added `docs/WARRIORS_ARCHITECTURE.md` documenting the separate 3D-aspect and HUD-scale architecture used by The Warriors Fusion Fix.
+- Added a self-contained PSP PRX implementation under `plugin/`.
+- Added PPSSPP manifest/config packaging for `ULUS10466` only.
+- Added a GitHub Actions PSPSDK build using `pspdev/pspdev:latest`.
+- Fixed the initial PSPSDK cache-invalidation compile issue.
+- **GitHub Actions run 2 completed successfully and produced a packaged PRX artifact.**
 
-## Current Blocker
+## Plugin Behavior
 
-The repository's EBOOT can be analyzed locally, but the next useful ranking of live screen-space candidates requires running the new scanner against the decrypted EBOOT and inspecting its report.
+### Verified 3D path
 
-The primary open question is now whether Tekken's visible HUD uses:
+The plugin patches these four ULUS10466 locations at runtime:
 
-- pre-transformed/sprite vertices,
-- a separate matrix family such as `0x08AC5BA8`,
-- a screen-coordinate conversion helper,
-- or a transform applied after the three generic orthographic setup paths.
+- `0x08945F10`
+- `0x08946794`
+- `0x08946BC8`
+- `0x08947D90`
 
-## Current Experimental Status
+Before writing, it verifies that each location still contains the expected `lui at,...` + `ori at,at,...` instruction shape. The default test config uses exact `20:9` for the POCO F5.
 
-The A/B/C diagnostic has completed its purpose and should not be repeated unless a newly identified screen points back to one of those paths.
+### Experimental HUD path
 
-No PRX plugin HUD patch is active yet. The safe baseline remains the working 20:9 3D CWCheat only.
+`HUDMode = 1` patches three 480.0 LUI loads in candidate Group A to 600.0:
 
-## Last Known-Good Behavior
+- `0x08A39288`
+- `0x08A392F4`
+- `0x08A39360`
 
-`ULUS10466.ini` remains the safe baseline: working 20:9 3D correction only, with HUD/UI still stretched when PPSSPP Display Layout is set to Stretch.
+`HUDMode = 2` isolates Group B:
 
-Do not replace or weaken that baseline while HUD research continues.
+- `0x08AA6314`
+- `0x08AA63B8`
+- `0x08AA64C0`
 
-## Latest Build Status
+`HUDMode = 3` applies both groups.
 
-No plugin source or PRX build output exists yet. This remains intentional; user testing disproved the first orthographic ownership hypothesis, so building a hook around those call sites now would encode the wrong abstraction.
+These HUD writes are guarded by opcode/value checks. They are not yet considered a final HUD fix.
 
-## Next Required Local Analysis
+## Current Reliability Statement
 
-After syncing the repository, run:
+- **3D aspect:** high confidence for this exact ULUS10466 executable because it reproduces the known-good user-tested patch and verifies instruction signatures before writing.
+- **HUD/UI:** experimental. The current repository findings are sufficient for a controlled plugin test, not sufficient to claim Warriors-level HUD reliability yet.
 
-```bash
-python -m pip install -r requirements.txt
-python tools/find_screen_space_candidates.py --output diagnostics/SCREEN_SPACE_CANDIDATES.md
+## Current Build
+
+Successful workflow:
+
+- Workflow: `Build PPSSPP plugin`
+- Run: `2`
+- Commit: `10ea8db60763bb293f65694cf0c5a5bf3337d215`
+- Artifact: `Tekken6-PPSSPP-UltrawideFix`
+
+Package contents:
+
+```text
+PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/
+├── Tekken6.PPSSPP.UltrawideFix.prx
+├── Tekken6.PPSSPP.UltrawideFix.ini
+└── plugin.ini
+TESTING.md
 ```
 
-Then review/commit the generated report so the next analysis pass can rank candidate live HUD/sprite paths without guessing.
+## Required User Test Order
 
-## User Validation Still Required
+1. Disable the old Tekken 6 widescreen CWCheat.
+2. Keep PPSSPP Display Layout = Stretch.
+3. Test `HUDMode = 0` first to verify the PRX reproduces the known-good 20:9 3D view.
+4. Test `HUDMode = 1` and record changes to health bars, timer, names, menus, pause screen, and fades.
+5. Test `HUDMode = 2` separately to classify the mask-like path.
+6. Only test `HUDMode = 3` if Groups A and B show complementary behavior.
+7. Send the generated plugin log after any mismatch or unexpected result.
 
-No further A/B/C visual testing is required now. Future user-side diagnostics should only be created after static analysis identifies a stronger live 2D/screen-space candidate.
+Detailed instructions are in `docs/PLUGIN_TEST.md`.
 
-All final visual behavior must still be validated in PPSSPP; static analysis alone is not proof of correctness.
+## Next Development Step
+
+Use the user's PPSSPP results to classify Group A and Group B. If Group A controls ordinary HUD while Group B owns masks/overlays, replace the diagnostic `HUDMode` system with a proper caller/context-aware `FixHUD` implementation. If neither group affects the visible HUD, reject them and continue tracing higher-level screen-space descriptor/caller paths rather than returning to the already rejected generic orthographic paths.
