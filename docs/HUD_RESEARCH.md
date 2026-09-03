@@ -32,9 +32,30 @@ Exactly three direct `jal` calls to `0x08ACA990` were identified in the file-bac
 | B | `0x088634A0` | `0x088634E4` | `0x088634F4` -> `0x08ACAB14` | Builds X `0..480`, Y `272..0` |
 | C | `0x08864494` | `0x088644B8` | `0x088644D4` -> `0x08ACAB14` | Builds X `0..480`, Y `272..0` |
 
-All three therefore establish a PSP-native 480x272 logical 2D projection. Which screen categories use each path is not yet visually classified.
+All three therefore establish a PSP-native 480x272 logical 2D projection.
 
 `tools/analyze_projection_paths.py` reproduces the direct perspective/ortho call scan and verifies the three original `480.0` instructions.
+
+### VERIFIED USER TEST: isolated A/B/C tests produced no visible HUD/UI/menu change
+
+On the target POCO F5 with PPSSPP Stretch and the known-good 20:9 3D patch enabled, the user tested `Diag - Ortho Path A 600-wide`, `Path B`, and `Path C` independently.
+
+Observed result:
+
+- Path A: no visible change in HUD/UI/menus.
+- Path B: no visible change in HUD/UI/menus.
+- Path C: no visible change in HUD/UI/menus.
+
+This is an important negative result. A `480 -> 600` horizontal orthographic change should be visually obvious if the tested visible UI is actively rendered through that projection path. Therefore the three direct `0x08ACA990` call sites should **not** be treated as the primary live HUD/UI path for the tested screens.
+
+Possible explanations still to distinguish:
+
+1. the three paths are used by other rendering categories not visited during the test,
+2. they are initialization/utility/dead paths for normal fight/menu rendering,
+3. Tekken's visible HUD uses pre-transformed/sprite geometry or a different matrix path,
+4. a later transform overrides/neutralizes these matrices.
+
+The next research phase should therefore pivot away from A/B/C and search more broadly for the live screen-space/sprite coordinate path.
 
 ### STRONG EVIDENCE: why the previous global HUD experiment broke overlays
 
@@ -43,31 +64,50 @@ A centered 16:9 safe area inside a 20:9 output has a virtual width of 600 logica
 - `480 * (20 / 16) = 600`
 - centered around original X center `240` gives bounds `[-60, 540]`
 
-Earlier experiments changed all three orthographic paths from X `0..480` to X `-60..540`. The math itself is consistent with preserving ordinary 16:9 HUD proportions after a 20:9 final stretch.
+Earlier experiments changed broad 2D rendering behavior using this kind of safe-area math. The math itself can preserve ordinary 16:9 HUD proportions after a 20:9 final stretch.
 
-However, a full-screen quad still authored from X `0..480` then occupies only the central 480 units of a 600-unit projection. This provides a direct architectural explanation for the historical symptom where a dark pause overlay/fade stopped covering the full screen: ordinary HUD and full-screen overlays cannot necessarily receive the same safe-area treatment.
+However, a full-screen quad still authored from X `0..480` then occupies only the central 480 units of a 600-unit projection. This remains a useful explanation for the historical symptom where a dark pause overlay/fade stopped covering the full screen: ordinary HUD and full-screen overlays cannot necessarily receive the same treatment.
 
-Status: STRONG EVIDENCE. The exact caller/screen ownership of paths A/B/C still needs PPSSPP runtime/visual validation.
+The new no-op A/B/C result means those three specific orthographic paths are not sufficient to explain the historical overlay behavior; another 2D/sprite path must still be identified.
 
 ### REJECTED as a first-line HUD target: `0x08864B74` path
 
 A previous broad safe-area experiment also modified code around `0x08864B74`. Static disassembly shows that this path does **not** call the orthographic builder `0x08ACA990`; it calls a different routine at `0x08AC5BA8`.
 
-It should not be included in the first isolated orthographic-path experiments without separate evidence.
+It should not be included in a new HUD fix without separate evidence, but the distinct `0x08AC5BA8` path is now worth analyzing as a possible screen-space/sprite transform family because A/B/C did not affect visible UI.
 
-## New Diagnostic Strategy
+## Superseded Diagnostic Strategy
 
-Instead of changing whole projection sequences, `diagnostics/ULUS10466_ORTHO_PATH_TEST.ini` changes only the right X bound from `480.0` to `600.0` for one path at a time:
+`diagnostics/ULUS10466_ORTHO_PATH_TEST.ini` remains in the repository as a reproducible negative test artifact. It changes only the right X bound from `480.0` to `600.0` for one path at a time:
 
 - Path A: CWCheat `0x20063230`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
 - Path B: CWCheat `0x200634A0`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
 - Path C: CWCheat `0x20064494`, original word `0x3C0143F0`, diagnostic word `0x3C014416`
 
-`600.0f` is `0x44160000`, so replacing only the `lui $at, 0x43F0` instruction with `lui $at, 0x4416` is intentionally minimal.
+The test has now served its purpose: none of the three paths visibly changed the tested HUD/UI/menu groups.
 
-This is **not a final HUD fix**. It deliberately produces a left-aligned/narrower-looking 2D group under Stretch so the user can identify which screens/elements each orthographic path owns without moving instruction sequences or touching sprite data.
+Do not spend further user time repeating A/B/C unless a newly identified screen specifically points back to one of them.
 
-Enable only one diagnostic path at a time and restore the three paths between tests.
+## New Static-Analysis Direction
+
+Use `tools/find_screen_space_candidates.py` to scan the decrypted EBOOT for likely PSP logical screen constants and nearby code/call structure.
+
+It searches for code/data related to:
+
+- `480.0`, `272.0`
+- `240.0`, `136.0`
+- `512.0`, `320.0`
+- `256.0`, `160.0`
+- corresponding small integer immediates
+
+The report is intentionally broad. Every hit remains a candidate until caller/use analysis shows that it belongs to live HUD/UI rendering.
+
+Special attention should now go to:
+
+- sprite batching / pre-transformed vertices,
+- screen-coordinate conversion functions,
+- matrix path around `0x08AC5BA8`,
+- functions that are shared by health bars, text, and menu panels but not necessarily by full-screen overlays.
 
 ## Important Prior Negative Result
 
