@@ -61,7 +61,7 @@ VERIFIED:
 
 ## Mapping Work Still Required
 
-The address conversion above is verified for the eight known EBOOT-resident 3D aspect instructions. The containing functions, callers, and rendering-mode meanings are not yet identified.
+The address conversion above is verified for the eight known EBOOT-resident 3D aspect instructions. Exact engine-level names are not available, but the aspect paths are now tied to the perspective projection builder documented below. Screen ownership of the three orthographic paths still requires runtime/visual classification.
 
 ## Aspect Dispatch Tables
 
@@ -95,8 +95,7 @@ STRONG EVIDENCE:
 
 HYPOTHESIS:
 
-- `aspect_dispatch_2` and `aspect_dispatch_4` are directly involved in projection or camera/frustum setup.
-- `aspect_dispatch_1` and `aspect_dispatch_3` may be aspect getter/helper paths used by higher-level projection code.
+- `aspect_dispatch_4` may be an additional camera/frustum or projection-parameter path not expressed as a direct call to the generic perspective builder.
 
 ## Direct Xrefs
 
@@ -104,12 +103,54 @@ VERIFIED:
 
 | Target | Direct `j`/`jal` xrefs found | Notes |
 | --- | --- | --- |
-| `0x08945ED4` | 6 | Four `jal`, one `j`, one additional `jal`; likely helper used by multiple projection paths |
+| `0x08945ED4` | 6 | Four `jal`, one `j`, one additional `jal`; helper used by multiple paths |
 | `0x089466EC` | 1 | One direct `j` tail-call at `0x08956E20` |
 | `0x08946B6C` | 2 | Direct `jal` at `0x08863CA4` and `0x08863F28` |
 | `0x08947834` | 0 | No direct `j`/`jal` found; may be reached indirectly |
 
 Use `tools/find_mips_xrefs.py` to reproduce this scan.
+
+## Perspective Projection Builder
+
+VERIFIED:
+
+- Generic perspective projection builder: `0x08ACA6C4`.
+- Exactly four direct calls were found in the file-backed executable:
+  - `0x08863D20`
+  - `0x08863D84`
+  - `0x089467A8`
+  - `0x08955494`
+- `aspect_dispatch_2` directly supplies the selected aspect in `$f12` to the builder at `0x089467A8`.
+- The function around `0x0895540C` calls `aspect_dispatch_1` at `0x08955440`, places the returned aspect into `$f12`, uses fields at `+0x34`, `+0x2c`, and `+0x30` for projection parameters, then calls `0x08ACA6C4` at `0x08955494`.
+- The function around `0x08863C4C` calls helper getters including `aspect_dispatch_3`, then calls `0x08ACA6C4` at `0x08863D20`; a related path calls it again at `0x08863D84`.
+
+This upgrades the interpretation of aspect dispatches 1-3: they are not merely generic aspect helpers; they participate directly in perspective/camera projection setup.
+
+## Orthographic Projection Builder and 2D Paths
+
+VERIFIED:
+
+- Generic orthographic projection builder: `0x08ACA990`.
+- Its operations match a standard orthographic matrix built from six float bounds (`$f12`-`$f17`).
+- Exactly three direct calls were found:
+  - Path A: `0x08863258`
+  - Path B: `0x088634E4`
+  - Path C: `0x088644B8`
+- All three callers set a PSP-native logical viewport with X `0.0..480.0` and Y `272.0..0.0` before calling the builder.
+- The right-X `480.0` instruction sites are:
+  - Path A runtime `0x08863230`, file `0x00060230`, CWCheat `0x20063230`, original `0x3C0143F0`
+  - Path B runtime `0x088634A0`, file `0x000604A0`, CWCheat `0x200634A0`, original `0x3C0143F0`
+  - Path C runtime `0x08864494`, file `0x00061494`, CWCheat `0x20064494`, original `0x3C0143F0`
+- Resulting matrices are then passed/combined through `0x08ACAB14` at or immediately after:
+  - `0x0886327C`
+  - `0x088634F4`
+  - `0x088644D4`
+
+STRONG EVIDENCE:
+
+- These are the highest-confidence candidates for shared 2D/UI coordinate-space setup.
+- The fact that there are three paths explains why a single global HUD constant was not sufficient in earlier experiments.
+- Their exact ownership (battle HUD, menus, overlays, etc.) must be classified with isolated runtime diagnostics before any final safe-area fix.
 
 ## Pattern Signatures
 
@@ -117,6 +158,7 @@ VERIFIED:
 
 - The exact original aspect pair `0x3C013FE3 0x34218E39` appears exactly four times in the original EBOOT.
 - A conservative first plugin implementation could scan for exactly four occurrences of this two-instruction pair, verify that all mapped locations match the known runtime addresses for `ULUS10466`, and patch only if the count and instructions match.
+- The three orthographic paths can be independently sanity-checked by verifying the original `lui $at, 0x43F0` (`480.0`) instruction at the documented right-bound sites and validating that each nearby call targets `0x08ACA990`.
 
 HYPOTHESIS:
 
