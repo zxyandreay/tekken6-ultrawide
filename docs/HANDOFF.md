@@ -32,6 +32,8 @@ The long-term goal is a PPSSPP plugin named `Tekken6.PPSSPP.UltrawideFix` that:
 - Initial baseline checkpoint pushed to `origin/main` at `f720d0157face81618f9b818e3d763977e55a6ae`.
 - CWCheat-to-EBOOT mapping has been verified for the eight known 3D aspect instructions.
 - `tools/analyze_eboot.py` reproduces the ELF summary, pattern counts, and address mapping.
+- `tools/disassemble_aspect_sites.py` dumps Capstone disassembly and six-entry aspect dispatch tables.
+- The four patched constants are case/index `0` in four aspect dispatch tables; case/index `5` loads a custom aspect from a structure field.
 
 ## Important Hashes
 
@@ -72,6 +74,7 @@ Optional camera site, not initial plugin scope:
 - Containing functions for the four 3D aspect patch sites.
 - Why four locations are required.
 - Whether the four locations represent different projection modes, different callers, or different copies of related setup code.
+- Exact function names and caller chains.
 - HUD/screen-space transform location.
 - Whether gameplay HUD, menus, overlays, and videos share any transform path.
 
@@ -79,7 +82,13 @@ Optional camera site, not initial plugin scope:
 
 No plugin source exists yet.
 
-No build command exists yet.
+No plugin build command exists yet.
+
+Analysis helpers:
+
+- `python tools/analyze_eboot.py`
+- Install disassembly dependency with `python -m pip install -r requirements.txt`.
+- `python tools/disassemble_aspect_sites.py --before 0x40 --after 0x80`
 
 No `dist/` output exists yet.
 
@@ -88,9 +97,9 @@ No `dist/` output exists yet.
 The initial checkpoint is pushed and `tools/analyze_eboot.py` exists. Next:
 
 1. Disassemble meaningful windows around the four sites with a MIPS-capable disassembler.
-2. Document surrounding instructions and likely function boundaries in `docs/ADDRESS_MAP.md`.
+2. Identify callers and stronger function boundaries for the four aspect dispatches.
 3. Derive relocation-stable byte signatures around each patch site.
-4. Only then study pattern signatures and plugin architecture.
+4. Only then study plugin architecture and safe runtime patching.
 
 ## Known Dead Ends
 

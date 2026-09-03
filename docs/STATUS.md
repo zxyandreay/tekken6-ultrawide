@@ -20,10 +20,12 @@ Phase 3: mapping the existing working 3D patch.
 - Pushed the initial baseline checkpoint to `origin/main` at `f720d0157face81618f9b818e3d763977e55a6ae`.
 - Verified the CWCheat-to-EBOOT mapping for all eight known 3D aspect instruction writes.
 - Added `tools/analyze_eboot.py` for repeatable ELF header inspection and known aspect address mapping.
+- Added a Capstone-based disassembly helper for the known aspect dispatch sites.
+- Documented the six-entry aspect dispatch tables and current projection-related evidence.
 
 ## Current Blocker
 
-None. Next work is MIPS disassembly around the four verified aspect pairs.
+None. Next work is caller discovery and stronger function-boundary analysis around the four verified aspect dispatches.
 
 ## Current Experimental Status
 
