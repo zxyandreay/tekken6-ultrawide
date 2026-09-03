@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'plugin/**'
+      - 'docs/PLUGIN_TEST.md'
       - '.github/workflows/build-plugin.yml'
 
 jobs:
