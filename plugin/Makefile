@@ -1,5 +1,5 @@
 TARGET = Tekken6.PPSSPP.UltrawideFix
-OBJS = main.o
+OBJS = main.o safe_area.o
 
 CFLAGS = -O2 -Os -G0 -Wall -Wextra -fno-pic
 LDFLAGS = -nostartfiles

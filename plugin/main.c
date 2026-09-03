@@ -4,24 +4,23 @@
 #include <psputils.h>
 #include <stdint.h>
 
-PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 5);
+PSP_MODULE_INFO("Tekken6UltrawideFix", PSP_MODULE_USER, 1, 6);
 PSP_NO_CREATE_MAIN_THREAD();
 
 #define CONFIG_PATH "ms0:/PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.ini"
 #define LOG_PATH    "ms0:/PSP/PLUGINS/Tekken6.PPSSPP.UltrawideFix/Tekken6.PPSSPP.UltrawideFix.log"
 
-#define BASE_ASPECT (16.0f / 9.0f)
-#define BASE_UI_WIDTH 480.0f
+#define BASE_3D_ASPECT (16.0f / 9.0f)
+#define PSP_FRAME_ASPECT (480.0f / 272.0f)
 #define ASPECT_SITE_COUNT 4
-#define HUD_CALLSITE_COUNT 3
 #define CAMERA_SITE 0x0895350Cu
-#define HUD_INIT_B 0x08A392F0u
+#define NATIVE_2D_VIEWPORT_CALL 0x08864B88u
 #define DEFAULT_PATCH_INTERVAL_MS 77
 
 #define ORIGINAL_ASPECT_HI 0x3C013FE3u
 #define ORIGINAL_ASPECT_LO 0x34218E39u
 #define ORIGINAL_CAMERA_WORD 0x3C013F80u
-#define ORIGINAL_HUD_INIT_JAL 0x0E28E4BCu
+#define ORIGINAL_NATIVE_2D_VIEWPORT_JAL 0x0E2B16EAu
 #define MIPS_EMUHACK_OPCODE 0x68000000u
 #define MIPS_EMUHACK_MASK   0xFC000000u
 
@@ -32,36 +31,29 @@ static const uint32_t kAspectSites[ASPECT_SITE_COUNT] = {
     0x08947D90u,
 };
 
-static const uint32_t kHudInitCallsites[HUD_CALLSITE_COUNT] = {
-    0x089A92D8u,
-    0x089AB3A4u,
-    0x089AD87Cu,
-};
-
 typedef struct Config {
     int enable3D;
     int enableCamera;
     int cameraPreset;
-    int enableHUDExperimental;
+    int enableNative2DSafeArea;
     int debugLogging;
     int aspectNum;
     int aspectDen;
     int patchIntervalMs;
 } Config;
 
-/*
- * Built-in defaults remain conservative if the INI is missing: validated 3D
- * and camera stay enabled, while the new v0.5 HUD hook stays opt-in.
- */
-static Config g_cfg = { 1, 1, 2, 0, 0, 20, 9, DEFAULT_PATCH_INTERVAL_MS };
+/* v0.6: validated 3D/camera + native-PSP flat-layer safe-area enabled. */
+static Config g_cfg = { 1, 1, 2, 1, 0, 20, 9, DEFAULT_PATCH_INTERVAL_MS };
 static volatile int g_running = 1;
 static int g_loggedUnexpected3D = 0;
 static int g_loggedUnexpectedCamera = 0;
-static int g_loggedUnexpectedHUD = 0;
-static float g_hudCanvasWidth = BASE_UI_WIDTH;
-static uint32_t g_hudHookJal = 0;
+static int g_loggedUnexpected2D = 0;
+static uint32_t g_native2DHookJal = 0;
 
-typedef int (*HudInitFn)(void *descriptor);
+/* Referenced by safe_area.S. Kept global so the PRX relocation can resolve it. */
+float g_safeAreaScale = 1.0f;
+
+extern void t6_native_2d_safe_viewport(void);
 
 static int str_len(const char *s) {
     int n = 0;
@@ -189,8 +181,8 @@ static void parse_config_line(char *line) {
         if (g_cfg.cameraPreset < 0) g_cfg.cameraPreset = 0;
         if (g_cfg.cameraPreset > 3) g_cfg.cameraPreset = 3;
     }
-    else if (str_eq(key, "EnableHUDExperimental"))
-        g_cfg.enableHUDExperimental = parse_int(value, g_cfg.enableHUDExperimental) != 0;
+    else if (str_eq(key, "EnableNative2DSafeArea"))
+        g_cfg.enableNative2DSafeArea = parse_int(value, g_cfg.enableNative2DSafeArea) != 0;
     else if (str_eq(key, "DebugLogging")) g_cfg.debugLogging = parse_int(value, g_cfg.debugLogging) != 0;
     else if (str_eq(key, "ForceAspectRatio")) parse_aspect(value);
     else if (str_eq(key, "PatchIntervalMs")) {
@@ -229,8 +221,17 @@ static void read_config(void) {
 }
 
 static float get_target_aspect(void) {
-    if (g_cfg.aspectNum <= 0 || g_cfg.aspectDen <= 0) return BASE_ASPECT;
+    if (g_cfg.aspectNum <= 0 || g_cfg.aspectDen <= 0) return BASE_3D_ASPECT;
     return (float)g_cfg.aspectNum / (float)g_cfg.aspectDen;
+}
+
+static float get_native_2d_scale(float targetAspect) {
+    float scale;
+    if (targetAspect <= 0.0f) return 1.0f;
+    scale = PSP_FRAME_ASPECT / targetAspect;
+    if (scale > 1.0f) scale = 1.0f;
+    if (scale < 0.25f) scale = 0.25f;
+    return scale;
 }
 
 static uint32_t get_target_camera_word(void) {
@@ -270,35 +271,9 @@ static uint32_t make_jal(uint32_t site, uintptr_t target, int *ok) {
 }
 
 /*
- * Experimental v0.5 HUD hook.
- *
- * The original initializer at 0x08A392F0 builds a 2D descriptor with a
- * 480x272 logical canvas. Static tracing isolated three external UI caller
- * sites which pass the descriptor in a0. We preserve the original call and
- * return value, then widen only descriptor +0x28. Nothing else in the
- * descriptor (including +0x4C) is changed.
- */
-__attribute__((noinline))
-static int hud_init_wide_canvas(void *descriptor) {
-    HudInitFn original = (HudInitFn)(uintptr_t)HUD_INIT_B;
-    int result = original(descriptor);
-
-    if (descriptor && g_cfg.enableHUDExperimental)
-        *(volatile float *)((uintptr_t)descriptor + 0x28u) = g_hudCanvasWidth;
-
-    return result;
-}
-
-/*
- * v0.3/v0.4 invalidated and rewrote code on every 77 ms poll. That behavior
- * proved the patch could survive PPSSPP JIT/emuhack handling, but it creates
- * unnecessary code-cache churn once a translated block already contains the
- * requested patch.
- *
- * v0.5 keeps the known-good invalidate-before-write operation for initial
- * installation and actual restoration, then treats a visible target or the
- * expected PPSSPP emuhack state as healthy. This makes the runtime much less
- * invasive and reduces an avoidable compatibility variable for texture packs.
+ * Low-churn runtime maintenance: install with PPSSPP's proven
+ * invalidate-before-write discipline, then leave healthy JIT/emuhack blocks
+ * alone until the original guest code actually reappears.
  */
 static int patch_one_aspect_site(uint32_t address, uint32_t targetHi, uint32_t targetLo,
                                  int force, int verbose) {
@@ -308,13 +283,8 @@ static int patch_one_aspect_site(uint32_t address, uint32_t targetHi, uint32_t t
     if (!force) {
         a = *(volatile uint32_t *)(uintptr_t)address;
         b = *(volatile uint32_t *)(uintptr_t)(address + 4u);
-
-        if (a == targetHi && b == targetLo)
-            return 1;
-
-        if (is_emuhack(a) && b == targetLo)
-            return 1;
-
+        if (a == targetHi && b == targetLo) return 1;
+        if (is_emuhack(a) && b == targetLo) return 1;
         if (!((a == ORIGINAL_ASPECT_HI && b == ORIGINAL_ASPECT_LO) || is_emuhack(a))) {
             if (verbose || !g_loggedUnexpected3D) {
                 log_pair("3D: unexpected live pair; skipped: ", address);
@@ -332,7 +302,6 @@ static int patch_one_aspect_site(uint32_t address, uint32_t targetHi, uint32_t t
         if (verbose) log_pair("3D: emuhack still present after invalidate: ", address);
         return 0;
     }
-
     if (!((a == ORIGINAL_ASPECT_HI && b == ORIGINAL_ASPECT_LO) ||
           (a == targetHi && b == targetLo))) {
         if (verbose || !g_loggedUnexpected3D) {
@@ -345,8 +314,6 @@ static int patch_one_aspect_site(uint32_t address, uint32_t targetHi, uint32_t t
     *(volatile uint32_t *)(uintptr_t)address = targetHi;
     *(volatile uint32_t *)(uintptr_t)(address + 4u) = targetLo;
     sceKernelDcacheWritebackRange((const void *)(uintptr_t)address, 8u);
-
-    if (verbose) log_pair("3D: installed/readback: ", address);
     return pair_is(address, targetHi, targetLo);
 }
 
@@ -355,7 +322,6 @@ static int patch_aspect_cycle(float aspect, int force, int verbose) {
     uint32_t targetLo;
     int i;
     int ok = 0;
-
     aspect_instructions(aspect, &targetHi, &targetLo);
     for (i = 0; i < ASPECT_SITE_COUNT; i++)
         ok += patch_one_aspect_site(kAspectSites[i], targetHi, targetLo, force, verbose);
@@ -367,9 +333,8 @@ static int patch_camera(int force, int verbose) {
     uint32_t target = get_target_camera_word();
 
     if (!force) {
-        current = *(volatile uint32_t *)CAMERA_SITE;
-        if (current == target || is_emuhack(current))
-            return 1;
+        current = *(volatile uint32_t *)(uintptr_t)CAMERA_SITE;
+        if (current == target || is_emuhack(current)) return 1;
         if (current != ORIGINAL_CAMERA_WORD) {
             if (verbose || !g_loggedUnexpectedCamera) {
                 log_word("Camera: unexpected live word; skipped: ", CAMERA_SITE);
@@ -379,14 +344,9 @@ static int patch_camera(int force, int verbose) {
         }
     }
 
-    sceKernelIcacheInvalidateRange((const void *)CAMERA_SITE, 4u);
-    current = *(volatile uint32_t *)CAMERA_SITE;
-
-    if (is_emuhack(current)) {
-        if (verbose) log_word("Camera: emuhack still present after invalidate: ", CAMERA_SITE);
-        return 0;
-    }
-
+    sceKernelIcacheInvalidateRange((const void *)(uintptr_t)CAMERA_SITE, 4u);
+    current = *(volatile uint32_t *)(uintptr_t)CAMERA_SITE;
+    if (is_emuhack(current)) return 0;
     if (!(current == ORIGINAL_CAMERA_WORD || current == target)) {
         if (verbose || !g_loggedUnexpectedCamera) {
             log_word("Camera: unexpected restored word; skipped: ", CAMERA_SITE);
@@ -395,68 +355,58 @@ static int patch_camera(int force, int verbose) {
         return 0;
     }
 
-    *(volatile uint32_t *)CAMERA_SITE = target;
-    sceKernelDcacheWritebackRange((const void *)CAMERA_SITE, 4u);
-
-    if (verbose) log_word("Camera: installed/readback: ", CAMERA_SITE);
+    *(volatile uint32_t *)(uintptr_t)CAMERA_SITE = target;
+    sceKernelDcacheWritebackRange((const void *)(uintptr_t)CAMERA_SITE, 4u);
     return word_is(CAMERA_SITE, target);
 }
 
-static int patch_one_hud_callsite(uint32_t address, int force, int verbose) {
+/*
+ * The v0.6 2D fix is deliberately one presentation-layer hook, not a list of
+ * HUD coordinate edits. 0x08864B88 is a live surface/sprite viewport call
+ * which is separate from the nearby perspective and generic-ortho setup
+ * paths. safe_area.S receives the original viewport floats, compresses only
+ * the viewport width around its own center, then calls Tekken's original
+ * viewport routine. Authored UI coordinates remain unchanged.
+ */
+static int patch_native_2d_safe_area(int force, int verbose) {
     uint32_t current;
 
-    if (!g_hudHookJal)
-        return 0;
+    if (!g_native2DHookJal) return 0;
 
     if (!force) {
-        current = *(volatile uint32_t *)(uintptr_t)address;
-        if (current == g_hudHookJal || is_emuhack(current))
-            return 1;
-        if (current != ORIGINAL_HUD_INIT_JAL) {
-            if (verbose || !g_loggedUnexpectedHUD) {
-                log_word("HUD: unexpected live callsite; skipped: ", address);
-                g_loggedUnexpectedHUD = 1;
+        current = *(volatile uint32_t *)(uintptr_t)NATIVE_2D_VIEWPORT_CALL;
+        if (current == g_native2DHookJal || is_emuhack(current)) return 1;
+        if (current != ORIGINAL_NATIVE_2D_VIEWPORT_JAL) {
+            if (verbose || !g_loggedUnexpected2D) {
+                log_word("2D: unexpected live viewport call; skipped: ", NATIVE_2D_VIEWPORT_CALL);
+                g_loggedUnexpected2D = 1;
             }
             return 0;
         }
     }
 
-    sceKernelIcacheInvalidateRange((const void *)(uintptr_t)address, 4u);
-    current = *(volatile uint32_t *)(uintptr_t)address;
+    sceKernelIcacheInvalidateRange((const void *)(uintptr_t)NATIVE_2D_VIEWPORT_CALL, 4u);
+    current = *(volatile uint32_t *)(uintptr_t)NATIVE_2D_VIEWPORT_CALL;
 
-    if (is_emuhack(current)) {
-        if (verbose) log_word("HUD: emuhack still present after invalidate: ", address);
-        return 0;
-    }
-
-    if (!(current == ORIGINAL_HUD_INIT_JAL || current == g_hudHookJal)) {
-        if (verbose || !g_loggedUnexpectedHUD) {
-            log_word("HUD: unexpected restored callsite; skipped: ", address);
-            g_loggedUnexpectedHUD = 1;
+    if (is_emuhack(current)) return 0;
+    if (!(current == ORIGINAL_NATIVE_2D_VIEWPORT_JAL || current == g_native2DHookJal)) {
+        if (verbose || !g_loggedUnexpected2D) {
+            log_word("2D: unexpected restored viewport call; skipped: ", NATIVE_2D_VIEWPORT_CALL);
+            g_loggedUnexpected2D = 1;
         }
         return 0;
     }
 
-    *(volatile uint32_t *)(uintptr_t)address = g_hudHookJal;
-    sceKernelDcacheWritebackRange((const void *)(uintptr_t)address, 4u);
-
-    if (verbose) log_word("HUD: installed targeted initializer hook: ", address);
-    return word_is(address, g_hudHookJal);
-}
-
-static int patch_hud_cycle(int force, int verbose) {
-    int i;
-    int ok = 0;
-    for (i = 0; i < HUD_CALLSITE_COUNT; i++)
-        ok += patch_one_hud_callsite(kHudInitCallsites[i], force, verbose);
-    return ok;
+    *(volatile uint32_t *)(uintptr_t)NATIVE_2D_VIEWPORT_CALL = g_native2DHookJal;
+    sceKernelDcacheWritebackRange((const void *)(uintptr_t)NATIVE_2D_VIEWPORT_CALL, 4u);
+    return word_is(NATIVE_2D_VIEWPORT_CALL, g_native2DHookJal);
 }
 
 static int patch_thread(SceSize args, void *argp) {
     float aspect = get_target_aspect();
     int first3D = 1;
     int firstCamera = 1;
-    int firstHUD = 1;
+    int first2D = 1;
     (void)args;
     (void)argp;
 
@@ -464,10 +414,8 @@ static int patch_thread(SceSize args, void *argp) {
         if (g_cfg.enable3D) {
             int ok = patch_aspect_cycle(aspect, first3D, first3D);
             if (first3D) {
-                if (ok == ASPECT_SITE_COUNT)
-                    log_text("3D: initial low-churn cycle installed all four sites\n");
-                else
-                    log_text("3D: initial low-churn cycle did not install all four sites\n");
+                if (ok == ASPECT_SITE_COUNT) log_text("3D: installed all four validated aspect sites\n");
+                else log_text("3D: did not install all four validated aspect sites\n");
                 first3D = 0;
             }
         }
@@ -475,22 +423,18 @@ static int patch_thread(SceSize args, void *argp) {
         if (g_cfg.enableCamera) {
             int ok = patch_camera(firstCamera, firstCamera);
             if (firstCamera) {
-                if (ok)
-                    log_text("Camera: initial low-churn cycle installed the camera site\n");
-                else
-                    log_text("Camera: initial low-churn cycle did not install the camera site\n");
+                if (ok) log_text("Camera: installed validated camera site\n");
+                else log_text("Camera: failed to install validated camera site\n");
                 firstCamera = 0;
             }
         }
 
-        if (g_cfg.enableHUDExperimental && g_hudHookJal) {
-            int ok = patch_hud_cycle(firstHUD, firstHUD);
-            if (firstHUD) {
-                if (ok == HUD_CALLSITE_COUNT)
-                    log_text("HUD: installed all three targeted experimental UI hooks\n");
-                else
-                    log_text("HUD: did not install all three targeted experimental UI hooks\n");
-                firstHUD = 0;
+        if (g_cfg.enableNative2DSafeArea && g_native2DHookJal) {
+            int ok = patch_native_2d_safe_area(first2D, first2D);
+            if (first2D) {
+                if (ok) log_text("2D: installed native-PSP safe-area viewport hook\n");
+                else log_text("2D: failed to install native-PSP safe-area viewport hook\n");
+                first2D = 0;
             }
         }
 
@@ -507,17 +451,21 @@ int module_start(SceSize args, void *argp) {
     (void)argp;
 
     sceIoRemove(LOG_PATH);
-    raw_log("=== Tekken6.PPSSPP.UltrawideFix v0.5 ===\n");
+    raw_log("=== Tekken6.PPSSPP.UltrawideFix v0.6 ===\n");
     raw_log("Plugin module_start reached successfully\n");
 
     read_config();
     aspect = get_target_aspect();
-    g_hudCanvasWidth = BASE_UI_WIDTH * (aspect / BASE_ASPECT);
-    g_hudHookJal = make_jal(kHudInitCallsites[0], (uintptr_t)&hud_init_wide_canvas, &jalOk);
+    g_safeAreaScale = get_native_2d_scale(aspect);
 
-    if (g_cfg.enableHUDExperimental && !jalOk) {
-        g_hudHookJal = 0;
-        raw_log("HUD: hook target is outside the callsites' JAL region; experimental HUD disabled\n");
+    if (g_cfg.enableNative2DSafeArea) {
+        g_native2DHookJal = make_jal(NATIVE_2D_VIEWPORT_CALL,
+                                     (uintptr_t)&t6_native_2d_safe_viewport,
+                                     &jalOk);
+        if (!jalOk) {
+            g_native2DHookJal = 0;
+            raw_log("2D: hook target is outside the game callsite JAL region; safe area disabled\n");
+        }
     }
 
     thread = sceKernelCreateThread("T6UWRuntime", patch_thread, 0x20, 0x3000, 0, 0);
