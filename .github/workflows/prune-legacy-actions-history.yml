@@ -1,0 +1,37 @@
+name: Prune legacy actions history
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/prune-legacy-actions-history.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete previous workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+            --jq '.workflow_runs[].id' | while read -r run_id; do
+              if [ "$run_id" != "$GITHUB_RUN_ID" ]; then
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" || true
+              fi
+            done
+
+      - name: Attempt to simplify repository topics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/topics" \
+            -H 'Accept: application/vnd.github+json' \
+            --input - <<'JSON' || true
+          {"names":["aspect-ratio","camera-fix","cwcheat","game-fix","ppsspp","psp","tekken","tekken6","ultrawide","widescreen"]}
+          JSON
