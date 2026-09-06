@@ -63,10 +63,25 @@ Use only **one aspect-ratio entry** and **one camera entry** at a time.
    ```
 
 3. Start Tekken 6 USA (`ULUS10466`).
-4. Set PPSSPP's display layout/scaling so the game fills the target display.
+4. Configure PPSSPP to stretch the game output to your display using the steps below.
 5. Open PPSSPP's **Cheats** menu.
 6. Under **ASPECT RATIO**, enable the single entry that matches your display or PPSSPP output area.
 7. Under **CAMERA**, optionally enable one camera preset.
+
+### Stretch the game to fill your display
+
+PPSSPP normally preserves the PSP display area unless you tell it to stretch the output. To make the game fill a wider phone, tablet, or monitor:
+
+1. Open **PPSSPP Settings**.
+2. Go to **Graphics**.
+3. Open **Display layout & effects**.
+4. Enable **Stretch** so the PSP output fills the available display area.
+5. Return to the game and open **Cheats**.
+6. Enable the aspect-ratio entry that matches the area you stretched PPSSPP to fill.
+
+For example, use **20:9** on a 20:9 phone or **21:9** on a 21:9 ultrawide monitor.
+
+**Stretch** makes PPSSPP fill the display, while this CWCheat corrects the game's 3D projection for that wider shape. Use both together with matching aspect ratios; stretching the image without the matching aspect-ratio cheat will distort the game's geometry.
 
 If another Tekken 6 cheat modifies the same aspect-ratio or camera addresses, disable it to avoid conflicts.
 
