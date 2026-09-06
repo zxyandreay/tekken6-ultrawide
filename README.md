@@ -1,6 +1,6 @@
 # Tekken 6 PPSSPP Aspect Ratio + Camera CWCheat
 
-A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone and tablet displays, adjustable gameplay camera widths, and a native 60 FPS state entry without requiring a PPSSPP plugin.
+A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone and tablet displays plus adjustable gameplay camera widths.
 
 > **Format:** CWCheat (`ULUS10466.ini`)  
 > **Game:** Tekken 6 USA (`ULUS10466`)  
@@ -14,11 +14,10 @@ The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. 
 
 - Eight selectable screen aspect ratios covering common phone and tablet formats.
 - Four camera choices: Original, Slightly Wider, Wider, and Widest.
-- Native 60 FPS state entry.
-- Clean PPSSPP cheat-menu sections for Aspect Ratio, Camera, Framerate, and Restore.
-- Independent screen and camera entries, so you can combine any supported ratio with your preferred camera.
-- Restore entry for returning aspect ratio, camera, and framerate state to their defaults.
-- Plain CWCheat configuration: no PRX/plugin installation or device-specific package.
+- Clean PPSSPP cheat-menu sections for Aspect Ratio, Camera, and Restore.
+- Independent aspect-ratio and camera entries, so you can combine any supported ratio with your preferred camera.
+- Restore entry for returning the aspect ratio and camera values to their defaults.
+- Single-file CWCheat setup through `ULUS10466.ini`.
 
 ## Cheat menu
 
@@ -41,11 +40,8 @@ CAMERA
   Wider
   Widest
 
-FRAMERATE
-  60 FPS (Native)
-
 RESTORE
-  Restore All Defaults
+  Restore Aspect + Camera
 ```
 
 Use only **one aspect-ratio entry** and **one camera entry** at a time.
@@ -64,9 +60,8 @@ Use only **one aspect-ratio entry** and **one camera entry** at a time.
 5. Open PPSSPP's **Cheats** menu.
 6. Under **ASPECT RATIO**, enable the single entry that matches your display or PPSSPP output area.
 7. Under **CAMERA**, optionally enable one camera preset.
-8. **60 FPS (Native)** normally does not need to be enabled because Tekken 6 already targets 60 FPS. It is provided as an explicit native-state/restore option if another cheat has changed the framerate state.
 
-If another Tekken 6 cheat modifies the same aspect, camera, or framerate addresses, disable it to avoid conflicts.
+If another Tekken 6 cheat modifies the same aspect-ratio or camera addresses, disable it to avoid conflicts.
 
 ## Supported aspect ratios
 
@@ -81,7 +76,7 @@ If another Tekken 6 cheat modifies the same aspect, camera, or framerate address
 | `16:10` | Common Android tablets |
 | `4:3` | Common tablet format |
 
-The ratio patches all use the same four proven game-code sites as the original 20:9 patch. Each entry only changes the embedded aspect-ratio float, so the patching method remains identical across the supported ratios.
+The ratio patches all use the same four game-code sites as the original 20:9 patch. Each entry changes only the embedded aspect-ratio value, keeping the patching method consistent across the supported ratios.
 
 ## Camera options
 
@@ -94,23 +89,9 @@ The ratio patches all use the same four proven game-code sites as the original 2
 
 The camera presets use a separate gameplay-camera address, so changing the aspect ratio does not force a particular camera width.
 
-## 60 FPS clarification
-
-**Tekken 6 already runs with a native 60 FPS target.** This file therefore does not include a fake or unnecessary "60 FPS unlock."
-
-The included `60 FPS (Native)` entry writes the native framerate state:
-
-```text
-0x20452890 = 0x00000001
-```
-
-This is useful for restoring the game's normal 60 FPS state if another cheat has modified that value. A commonly reposted code using the same address with value `0x00000002` is a **30 FPS modification**, not a 60 FPS unlock.
-
-PPSSPP also carries game-specific compatibility handling for Tekken 6 under its `ForceMax60FPS` compatibility setting. If the emulator reports fewer than 60 rendered frames during gameplay, that can be a performance/full-speed issue rather than a missing 60 FPS patch.
-
 ## How the screen patch works
 
-Tekken 6's original aspect constant is **16:9**. Each screen entry writes a different IEEE-754 aspect-ratio value into the same four runtime sites used by the established 20:9 patch.
+Tekken 6's original aspect constant is **16:9**. Each aspect-ratio entry writes a different IEEE-754 value into the same four runtime sites.
 
 | Ratio | Float value |
 | --- | ---: |
@@ -135,7 +116,6 @@ For best geometry, choose the aspect-ratio entry matching the physical display o
 
 - The aspect patch corrects the game's 3D projection for the selected output ratio.
 - Tekken's original 2D HUD/menu layout is not independently repositioned or corrected.
-- The `60 FPS (Native)` entry does not make hardware run the emulator faster; PPSSPP still needs to sustain full emulation speed.
 - PPSSPP display scaling, texture packs, emulator settings, and other cheats can affect the final presentation.
 - For a clean test after changing conflicting cheats, fully restart the game.
 
@@ -145,4 +125,4 @@ For best geometry, choose the aspect-ratio entry matching the physical display o
 ULUS10466.ini
 ```
 
-The repository intentionally remains focused on the CWCheat configuration and its usage documentation.
+The repository intentionally remains focused on aspect-ratio correction and camera adjustment for Tekken 6 on PPSSPP.
