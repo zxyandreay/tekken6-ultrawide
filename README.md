@@ -1,6 +1,6 @@
 # Tekken 6 PPSSPP Aspect Ratio + Camera CWCheat
 
-A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone and tablet displays plus adjustable gameplay camera widths.
+A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone, tablet, and desktop displays plus adjustable gameplay camera widths.
 
 ![Tekken 6 aspect ratio and camera adjustment preview](assets/tekken6-aspect-camera-preview.webp)
 
@@ -14,7 +14,7 @@ The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. 
 
 ## Features
 
-- Eight selectable screen aspect ratios covering common phone and tablet formats.
+- Nine selectable screen aspect ratios covering common ultrawide, phone, tablet, and widescreen formats.
 - Four camera choices: Original, Slightly Wider, Wider, and Widest.
 - Clean PPSSPP cheat-menu sections for Aspect Ratio, Camera, and Restore.
 - Independent aspect-ratio and camera entries, so you can combine any supported ratio with your preferred camera.
@@ -27,6 +27,7 @@ Recent PPSSPP versions recognize the section-title convention used by this file,
 
 ```text
 ASPECT RATIO
+  21:9
   20:9
   19.5:9
   19:9
@@ -69,6 +70,7 @@ If another Tekken 6 cheat modifies the same aspect-ratio or camera addresses, di
 
 | Cheat entry | Typical use |
 | --- | --- |
+| `21:9` | Ultrawide monitors and desktop displays |
 | `20:9` | Common modern phones |
 | `19.5:9` | Common modern phones |
 | `19:9` | Phones |
@@ -97,6 +99,7 @@ Each supported aspect-ratio entry writes its corresponding IEEE-754 value into t
 
 | Ratio | Float value |
 | --- | ---: |
+| 21:9 | 2.3333333 |
 | 20:9 | 2.2222222 |
 | 19.5:9 | 2.1666667 |
 | 19:9 | 2.1111112 |
