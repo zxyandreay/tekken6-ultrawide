@@ -2,6 +2,8 @@
 
 A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone and tablet displays plus adjustable gameplay camera widths.
 
+![Tekken 6 aspect ratio and camera adjustment preview](assets/tekken6-aspect-camera-preview.webp)
+
 > **Format:** CWCheat (`ULUS10466.ini`)  
 > **Game:** Tekken 6 USA (`ULUS10466`)  
 > **Emulator:** PPSSPP with cheats enabled
