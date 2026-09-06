@@ -12,6 +12,10 @@ The cheat is device-agnostic: it patches the emulated game rather than targeting
 
 The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. Use your own legally obtained copy of Tekken 6.
 
+## Download
+
+Go to the [latest release](https://github.com/zxyandreay/tekken6-ultrawide/releases/latest) and download **`ULUS10466.ini`** from the **Assets** section. This is the only file you need to install the cheat.
+
 ## Features
 
 - Nine selectable screen aspect ratios covering common ultrawide, phone, tablet, and widescreen formats.
@@ -52,7 +56,7 @@ Use only **one aspect-ratio entry** and **one camera entry** at a time.
 ## Installation
 
 1. In PPSSPP, enable **Cheats**.
-2. Copy [`ULUS10466.ini`](ULUS10466.ini) into your active PPSSPP cheat folder:
+2. Copy `ULUS10466.ini` into your active PPSSPP cheat folder:
 
    ```text
    PSP/Cheats/ULUS10466.ini
