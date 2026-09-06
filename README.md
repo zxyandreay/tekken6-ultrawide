@@ -1,14 +1,10 @@
 # Tekken 6 PPSSPP Aspect Ratio + Camera CWCheat
 
-A lightweight CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It provides selectable aspect-ratio patches for common phone, tablet, and desktop displays plus adjustable gameplay camera widths.
+A CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP with selectable aspect ratios and adjustable gameplay camera widths.
 
 ![Tekken 6 aspect ratio and camera adjustment preview](assets/tekken6-aspect-camera-preview.png)
 
 > **Screenshot settings:** `20:9` aspect ratio + `Widest` camera
-
-The cheat is device-agnostic: it patches the emulated game rather than targeting a specific phone, tablet, handheld, or computer.
-
-The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. Use your own legally obtained copy of Tekken 6.
 
 ## Installation
 
@@ -20,51 +16,12 @@ The project is not affiliated with Bandai Namco Entertainment, Sony, or PPSSPP. 
    ```
 
 3. Open PPSSPP and make sure **Cheats** are enabled.
-4. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch** so the game output fills your display.
+4. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch** so the game fills your display.
 5. Start **Tekken 6 USA (`ULUS10466`)** and open PPSSPP's **Cheats** menu.
 6. Under **ASPECT RATIO**, enable **one** entry that matches your display or PPSSPP output area. For example, use **20:9** on a 20:9 phone or **21:9** on a 21:9 ultrawide monitor.
 7. Under **CAMERA**, optionally enable **one** camera preset.
 
-PPSSPP's **Stretch** option makes the game fill the available display area, while the aspect-ratio cheat corrects the game's 3D projection for that shape. Use a matching aspect-ratio entry to avoid distorted geometry.
-
-If another Tekken 6 cheat modifies the same aspect-ratio or camera addresses, disable it to avoid conflicts.
-
-## Features
-
-- Nine selectable screen aspect ratios covering common ultrawide, phone, tablet, and widescreen formats.
-- Four camera choices: Original, Slightly Wider, Wider, and Widest.
-- Clean PPSSPP cheat-menu sections for Aspect Ratio, Camera, and Restore.
-- Independent aspect-ratio and camera entries, so you can combine any supported ratio with your preferred camera.
-- Restore entry for returning the aspect ratio and camera values to their defaults.
-- Single-file CWCheat setup through `ULUS10466.ini`.
-
-## Cheat menu
-
-Recent PPSSPP versions recognize the section-title convention used by this file, so the cheat list is organized like this:
-
-```text
-ASPECT RATIO
-  21:9
-  20:9
-  19.5:9
-  19:9
-  18.5:9
-  18:9 (2:1)
-  16:9
-  16:10
-  4:3
-
-CAMERA
-  Original
-  Slightly Wider
-  Wider
-  Widest
-
-RESTORE
-  Restore Aspect + Camera
-```
-
-Use only **one aspect-ratio entry** and **one camera entry** at a time.
+PPSSPP's **Stretch** option fills the display, while the matching aspect-ratio cheat corrects the game's 3D projection for that shape.
 
 ## Supported aspect ratios
 
@@ -80,8 +37,6 @@ Use only **one aspect-ratio entry** and **one camera entry** at a time.
 | `16:10` | Common Android tablets |
 | `4:3` | Common tablet format |
 
-All supported ratio entries use the same four game-code sites. Each entry changes only the embedded aspect-ratio value, keeping the patching method consistent across the supported ratios.
-
 ## Camera options
 
 | Cheat entry | Effect |
@@ -91,35 +46,12 @@ All supported ratio entries use the same four game-code sites. Each entry change
 | `Wider` | Wider gameplay framing |
 | `Widest` | Maximum included camera preset |
 
-The camera presets use a separate gameplay-camera address, so changing the aspect ratio does not force a particular camera width.
-
-## How the screen patch works
-
-Each supported aspect-ratio entry writes its corresponding IEEE-754 value into the same four runtime sites.
-
-| Ratio | Float value |
-| --- | ---: |
-| 21:9 | 2.3333333 |
-| 20:9 | 2.2222222 |
-| 19.5:9 | 2.1666667 |
-| 19:9 | 2.1111112 |
-| 18.5:9 | 2.0555556 |
-| 18:9 | 2.0000000 |
-| 16:9 | 1.7777778 |
-| 16:10 | 1.6000000 |
-| 4:3 | 1.3333334 |
+Use **Restore Aspect + Camera** from the cheat menu to return both settings to their defaults.
 
 ## Compatibility
 
-This repository targets the **USA release of Tekken 6 (`ULUS10466`)**. The addresses are specific to that game build and should not be assumed to work with other regional releases.
-
-Because this is a CWCheat patch, it is not tied to a particular physical device. It can be used anywhere PPSSPP supports the same game build and CWCheat functionality.
-
-For best geometry, choose the aspect-ratio entry matching the physical display or PPSSPP output area. A mismatched ratio will intentionally produce the wrong horizontal geometry.
+This cheat targets the **USA release of Tekken 6 (`ULUS10466`)**. Other regional versions are not supported.
 
 ## Limitations
 
-- The aspect patch corrects the game's 3D projection for the selected output ratio.
-- Tekken's original 2D HUD/menu layout is not independently repositioned or corrected.
-- PPSSPP display scaling, texture packs, emulator settings, and other cheats can affect the final presentation.
-- For a clean test after changing conflicting cheats, fully restart the game.
+- The 3D aspect ratio is corrected, but Tekken 6's original 2D HUD and menu layout is not independently repositioned or corrected.
