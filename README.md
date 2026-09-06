@@ -121,5 +121,3 @@ For best geometry, choose the aspect-ratio entry matching the physical display o
 - Tekken's original 2D HUD/menu layout is not independently repositioned or corrected.
 - PPSSPP display scaling, texture packs, emulator settings, and other cheats can affect the final presentation.
 - For a clean test after changing conflicting cheats, fully restart the game.
-
-The repository intentionally remains focused on aspect-ratio correction and camera adjustment for Tekken 6 on PPSSPP.
