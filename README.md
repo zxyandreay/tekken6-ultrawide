@@ -72,11 +72,11 @@ If another Tekken 6 cheat modifies the same aspect-ratio or camera addresses, di
 | `19:9` | Phones |
 | `18.5:9` | Phones |
 | `18:9 (2:1)` | Phones |
-| `16:9` | Original game aspect / older widescreen devices |
+| `16:9` | Widescreen devices |
 | `16:10` | Common Android tablets |
 | `4:3` | Common tablet format |
 
-The ratio patches all use the same four game-code sites as the original 20:9 patch. Each entry changes only the embedded aspect-ratio value, keeping the patching method consistent across the supported ratios.
+All supported ratio entries use the same four game-code sites. Each entry changes only the embedded aspect-ratio value, keeping the patching method consistent across the supported ratios.
 
 ## Camera options
 
@@ -91,7 +91,7 @@ The camera presets use a separate gameplay-camera address, so changing the aspec
 
 ## How the screen patch works
 
-Tekken 6's original aspect constant is **16:9**. Each aspect-ratio entry writes a different IEEE-754 value into the same four runtime sites.
+Each supported aspect-ratio entry writes its corresponding IEEE-754 value into the same four runtime sites.
 
 | Ratio | Float value |
 | --- | ---: |
