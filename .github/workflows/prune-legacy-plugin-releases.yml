@@ -1,0 +1,40 @@
+name: Prune legacy plugin releases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/prune-legacy-plugin-releases.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete legacy releases and tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          for release_id in 381909674 381962463 382021038; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" || true
+          done
+
+          for tag in v0.4 v0.5 v0.6; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" || true
+          done
+
+      - name: Remove this one-shot workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          path='.github/workflows/prune-legacy-plugin-releases.yml'
+          sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/${path}" --jq '.sha')"
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/contents/${path}" \
+            -f message='chore: remove one-shot legacy cleanup workflow' \
+            -f sha="$sha" \
+            -f branch='main'
