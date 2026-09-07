@@ -1,8 +1,8 @@
-# Tekken 6 PPSSPP Aspect Ratio + Camera CWCheat
+# Tekken 6 PPSSPP Ultrawide + Aspect Ratio + Camera CWCheat
 
-A CWCheat configuration for **Tekken 6 USA (`ULUS10466`)** on PPSSPP with selectable aspect ratios and adjustable gameplay camera widths.
+A CWCheat for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP** that adds ultrawide and widescreen aspect-ratio support, including 21:9, with adjustable gameplay camera presets.
 
-![Tekken 6 aspect ratio and camera adjustment preview](assets/tekken6-aspect-camera-preview.png)
+![Tekken 6 PPSSPP ultrawide 20:9 aspect ratio with Widest camera preview](assets/tekken6-aspect-camera-preview.png)
 
 > **Screenshot settings:** `20:9` aspect ratio + `Widest` camera
 
