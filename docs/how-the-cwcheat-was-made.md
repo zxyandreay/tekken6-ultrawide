@@ -1,34 +1,85 @@
 # How the Tekken 6 Ultrawide CWCheat Was Made
 
-This document explains a reproducible reverse-engineering workflow behind the aspect-ratio portion of this project's Tekken 6 CWCheat for the USA release (`ULUS10466`).
+This document records the development process behind the aspect-ratio and camera portions of this project's Tekken 6 CWCheat for the USA release (`ULUS10466`). It also explains how the original 20:9 patch evolved into the multi-ratio version currently published in this repository.
 
-## What the patch is actually changing
+## Original target
 
-PPSSPP can stretch the final PSP framebuffer to fill a wider display, but that alone does not change the game's internal 3D projection. Without correcting the projection, the image is simply stretched horizontally.
-
-The goal is therefore to find how Tekken 6 represents its normal 16:9 projection inside PSP/MIPS code, identify the code paths that use it, and replace that value with another target aspect ratio.
-
-For the original widescreen projection:
+The first working patch was built around a specific target setup:
 
 ```text
-16 / 9 = 1.777777777...
+Game:       Tekken 6
+Region:     USA
+Game ID:    ULUS10466
+Display:    2400 x 1080
+Aspect:     20:9
+Emulator:   PPSSPP
+```
+
+The goal was not simply to fill a 20:9 screen. PPSSPP can already stretch the PSP framebuffer to do that.
+
+The actual goal was:
+
+> Make Tekken 6 calculate a wider 3D projection so the world gains horizontal view while characters and geometry keep the correct proportions.
+
+The 2D HUD was allowed to remain stretched if correcting it independently proved unstable.
+
+---
+
+## 1. Calculate the target aspect ratio
+
+For a 2400 x 1080 display:
+
+```text
+2400 / 1080
+= 2.222222222...
+= 20 / 9
 ```
 
 As an IEEE-754 single-precision float:
 
 ```text
-1.7777778 = 0x3FE38E39
+20:9
+2.2222223
+0x400E38E4
 ```
 
-That numerical signature gives us something useful to search for, but the important part of the process is not to assume in advance how the game stores or constructs it.
+The original mathematical 16:9 value is:
 
-## 1. Start from the mathematical signature of 16:9
+```text
+16:9
+1.7777778
+0x3FE38E39
+```
 
-A straightforward first thought is to search the game's executable or runtime memory for the raw bytes representing `0x3FE38E39`.
+These two values became the important signatures for the first patch:
 
-That can work for games that store the aspect ratio as a normal float in a data table, but the Tekken 6 projection paths patched here reconstruct the value in MIPS instructions instead.
+```text
+Original 16:9:  0x3FE38E39
+Target 20:9:    0x400E38E4
+```
 
-The confirmed code uses this pair:
+---
+
+## 2. Inspect the game executable
+
+A decrypted/original `EBOOT.BIN` was used to inspect Tekken 6's PSP/MIPS executable code.
+
+The useful discovery was that the game did not expose one convenient writable aspect-ratio float in a data table. The relevant projection code constructs the 16:9 value directly in MIPS instructions.
+
+The original value:
+
+```text
+0x3FE38E39
+```
+
+is split into:
+
+```text
+upper = 0x3FE3
+lower = 0x8E39
+```
+
+and reconstructed by:
 
 ```asm
 lui  $at, 0x3FE3
@@ -42,55 +93,512 @@ Machine code:
 34218E39
 ```
 
-The two 16-bit immediates reconstruct:
+Together those two instructions construct:
 
 ```text
-0x3FE3 << 16 | 0x8E39
-= 0x3FE38E39
+0x3FE38E39
 = 1.7777778
 ≈ 16:9
 ```
 
-The useful reverse-engineering task is therefore not simply to search for `3C013FE3 34218E39`. Before that pattern is known, code can be scanned for instruction sequences that construct plausible floating-point constants and then ranked against common aspect ratios.
+That was the key 3D projection finding.
 
-## 2. Use a decrypted EBOOT.BIN for static analysis
+### EBOOT offsets and runtime addresses
 
-A useful static-analysis input is the game's decrypted `EBOOT.BIN`. PPSSPP can produce a decrypted executable for analysis, giving access to the PSP/MIPS machine code without having to inspect every instruction manually while the game is running.
+When working from an `EBOOT.BIN`, a file offset is not automatically a PSP virtual address or a CWCheat offset.
 
-The important distinction is that an `EBOOT.BIN` file offset is not automatically a runtime PSP address or a CWCheat offset.
+The practical relationship is:
 
 ```text
-EBOOT file offset
-        ↓
-map executable segment into PSP virtual memory
-        ↓
+EBOOT location
+      ↓
+map/locate the same code in loaded PSP memory
+      ↓
 runtime PSP address
-        ↓
-convert to CWCheat offset
+      ↓
+CWCheat offset
 ```
 
-The EBOOT is therefore most useful for discovering candidate instructions. Runtime memory or the PPSSPP debugger is then used to confirm where those instructions are loaded and whether changing them actually affects the projection.
+The released CWCheat offsets discussed below are the final confirmed locations used by the patch. They should not be assumed to be literal `EBOOT.BIN` file offsets.
 
-For quick triage, a script can scan the binary on 4-byte boundaries. For more precise analysis, restrict the scan to executable sections or segments rather than treating every byte in the file as code.
+---
 
-## 3. Use Python to discover candidate MIPS aspect-ratio constants
+## 3. Find every relevant 16:9 projection load
 
-Python can walk through the decrypted EBOOT's MIPS instructions and look for the general pattern:
+The same 16:9 construction appeared in four relevant projection locations.
+
+The confirmed CWCheat offsets are:
+
+```text
+0x00145F10 / 0x00145F14
+0x00146794 / 0x00146798
+0x00146BC8 / 0x00146BCC
+0x00147D90 / 0x00147D94
+```
+
+Using the PSP user-memory base `0x08800000`, the corresponding runtime PSP addresses are:
+
+```text
+0x08945F10 / 0x08945F14
+0x08946794 / 0x08946798
+0x08946BC8 / 0x08946BCC
+0x08947D90 / 0x08947D94
+```
+
+At the original 16:9 setting, every pair reconstructs the same constant:
+
+```text
+3C013FE3
+34218E39
+```
+
+Finding all four was important. Changing only one occurrence could leave other rendering or camera/projection paths at the stock value.
+
+---
+
+## 4. Convert 20:9 into equivalent MIPS instructions
+
+The target 20:9 float is:
+
+```text
+0x400E38E4
+```
+
+Split it into upper and lower 16-bit halves:
+
+```text
+upper = 0x400E
+lower = 0x38E4
+```
+
+Preserve the original instruction structure and replace only the constant:
 
 ```asm
-lui  register, HIGH16
-ori  same_register, same_register, LOW16
+lui  $at, 0x400E
+ori  $at, $at, 0x38E4
 ```
 
-For every matching pair it can reconstruct the 32-bit value:
+Machine code:
 
 ```text
-(HIGH16 << 16) | LOW16
+3C01400E
+342138E4
 ```
 
-The reconstructed bits can then be interpreted as an IEEE-754 float and compared against common aspect ratios such as 4:3, 16:10, 16:9, 2:1, 20:9, and 21:9.
+Comparison:
 
-A minimal scanner looks like this:
+```text
+Original 16:9
+3C013FE3
+34218E39
+
+20:9
+3C01400E
+342138E4
+```
+
+The surrounding game logic remains unchanged. Only the value being constructed is replaced.
+
+That small, targeted change is one reason the final 3D patch proved stable.
+
+---
+
+## 5. Convert the projection changes into CWCheat writes
+
+CWCheat type `2` performs a 32-bit write.
+
+The first 20:9 replacement is:
+
+```text
+_L 0x20145F10 0x3C01400E
+_L 0x20145F14 0x342138E4
+```
+
+The same replacement is applied to the remaining three confirmed paths:
+
+```text
+_L 0x20146794 0x3C01400E
+_L 0x20146798 0x342138E4
+
+_L 0x20146BC8 0x3C01400E
+_L 0x20146BCC 0x342138E4
+
+_L 0x20147D90 0x3C01400E
+_L 0x20147D94 0x342138E4
+```
+
+That was the original stable 20:9 projection patch.
+
+---
+
+## 6. Why PPSSPP Stretch is still required
+
+Changing the game's internal projection does not change the size of the PSP framebuffer itself.
+
+PPSSPP therefore still needs to scale that framebuffer to fill the physical display.
+
+Without the cheat:
+
+```text
+16:9 game projection
+        ↓
+PPSSPP Stretch
+        ↓
+20:9 display
+        ↓
+horizontally distorted 3D
+```
+
+With the cheat:
+
+```text
+20:9 game projection
+        ↓
+normal PSP framebuffer
+        ↓
+PPSSPP Stretch
+        ↓
+20:9 display
+        ↓
+correctly proportioned 3D
+```
+
+So the intended setup is:
+
+```text
+matching aspect-ratio CWCheat
++
+PPSSPP Stretch
+```
+
+Stretch fills the display; the cheat corrects the game's 3D projection for that shape.
+
+---
+
+## 7. Verify that the result is true ultrawide
+
+The important test was not whether the screen became full-width. Stretch already guarantees that.
+
+The useful test was whether:
+
+- fighters retained normal proportions
+- world geometry retained normal proportions
+- additional horizontal scene content became visible
+- the result behaved like a wider camera/projection rather than a stretched image
+
+Conceptually:
+
+```text
+Original 16:9
+
+      Fighter       Fighter
+    |--------------------|
+
+True 20:9
+
+      Fighter       Fighter
+|------------------------------|
+  more world visible on the sides
+
+Fake stretch
+
+    WIDE Fighter   WIDE Fighter
+|------------------------------|
+```
+
+That distinction confirmed that the patched values were controlling the 3D projection rather than merely changing output scaling.
+
+---
+
+## 8. Camera framing was handled separately
+
+After widening the projection, camera framing was experimented with independently.
+
+The useful camera CWCheat offset is:
+
+```text
+0x0015350C
+```
+
+The stock value exposed by the final cheat is:
+
+```text
+0x3F80
+```
+
+Small increments produced progressively wider framing:
+
+```text
+Original        0x3F80
+Slightly Wider  0x3F81
+Wider           0x3F82
+Widest          0x3F83
+```
+
+The corresponding CWCheat entries are:
+
+```text
+_C0 Original
+_L 0x1015350C 0x00003F80
+
+_C0 Slightly Wider
+_L 0x1015350C 0x00003F81
+
+_C0 Wider
+_L 0x1015350C 0x00003F82
+
+_C0 Widest
+_L 0x1015350C 0x00003F83
+```
+
+A deliberate design choice was made to keep projection and camera changes separate.
+
+The aspect-ratio entry corrects projection. The camera presets are optional framing choices.
+
+Only one camera preset should be enabled at a time because every preset writes the same address.
+
+---
+
+## 9. HUD correction was investigated separately
+
+Once the 3D projection was correct at 20:9, the remaining obvious issue was the 2D interface.
+
+The 3D scene was corrected, but the following still used the original PSP-oriented 2D layout and became horizontally stretched by PPSSPP Stretch:
+
+- health bars
+- round graphics
+- battle overlays
+- menu elements
+- pause-screen graphics
+- sprites and text
+
+The ideal target would have been:
+
+```text
++---------------------------------------+
+|                                       |
+|          original-proportion HUD      |
+|        +---------------------+        |
+|        | Health       Health |        |
+|        |                     |        |
+|        +---------------------+        |
+|                                       |
+|          wider 20:9 3D world          |
++---------------------------------------+
+```
+
+Unlike the 3D projection, however, the HUD did not reduce to one clean global aspect-ratio constant.
+
+### Broad rendering experiments
+
+Several broader 2D/sprite rendering paths were tested.
+
+Those experiments caused regressions including effects such as:
+
+- missing pause-screen dark overlays
+- rectangular rendering artifacts
+- incorrect sprite rendering
+- battle HUD corruption
+
+That showed that broad 2D rendering changes were affecting systems beyond the intended HUD scaling.
+
+### Narrower health-bar experiments
+
+More targeted health-bar changes were also attempted.
+
+Those were less destructive, but still did not correct the whole UI assembly consistently. For example, one modification could affect the health-bar fill while leaving its surrounding frame, icons, background, or related elements unchanged.
+
+Conceptually:
+
+```text
+Frame:
+|====================|
+
+Fill after partial correction:
+|============        |
+```
+
+Trying to extend the same correction further could cause empty or otherwise incorrect bars.
+
+At that point the difference in stability was clear:
+
+```text
+3D projection patch
+→ small, predictable, stable
+
+HUD patch
+→ spread across multiple rendering paths
+→ invasive
+→ regression-prone
+```
+
+The HUD work was therefore stopped rather than shipping a fragile "complete" fix.
+
+That is why the public patch intentionally corrects the 3D presentation while leaving the original 2D HUD/menu limitation documented.
+
+---
+
+## 10. Restore all experimental HUD changes
+
+Because many executable instructions had been modified while testing HUD approaches, cleanup was treated as a separate step rather than assuming that disabling experimental cheats would return everything to a known-good state.
+
+The original Tekken 6 executable was used as the reference, and **98 executable addresses** touched during the HUD experiments were restored to their original instructions.
+
+Only after returning to that clean baseline were the proven 3D projection and camera changes reapplied.
+
+This was important for two reasons:
+
+1. it removed hidden experimental state from the final result
+2. it ensured the public patch was based only on changes that had been deliberately validated
+
+---
+
+## 11. Build the clean initial patch
+
+The first clean final version kept only:
+
+- the proven 20:9 projection patch
+- optional camera presets
+- no HUD modifications
+
+The 20:9 portion was:
+
+```text
+_C0 Screen - 20:9 Ultrawide
+_L 0x20145F10 0x3C01400E
+_L 0x20145F14 0x342138E4
+_L 0x20146794 0x3C01400E
+_L 0x20146798 0x342138E4
+_L 0x20146BC8 0x3C01400E
+_L 0x20146BCC 0x342138E4
+_L 0x20147D90 0x3C01400E
+_L 0x20147D94 0x342138E4
+```
+
+Camera choices remained separate:
+
+```text
+_C0 Camera - Original
+_L 0x1015350C 0x00003F80
+
+_C0 Camera - Slightly Wider
+_L 0x1015350C 0x00003F81
+
+_C0 Camera - Wider
+_L 0x1015350C 0x00003F82
+
+_C0 Camera - Widest
+_L 0x1015350C 0x00003F83
+```
+
+The naming was later simplified when the repository was expanded to support multiple aspect ratios.
+
+---
+
+## 12. Keep an explicit restore option
+
+The original projection instructions were recorded rather than relying on the game to refresh them automatically.
+
+Original 16:9 instructions:
+
+```text
+3C013FE3
+34218E39
+```
+
+Original camera value:
+
+```text
+0x3F80
+```
+
+The current restore entry is:
+
+```text
+_C0 Restore Aspect + Camera
+_L 0x20145F10 0x3C013FE3
+_L 0x20145F14 0x34218E39
+_L 0x20146794 0x3C013FE3
+_L 0x20146798 0x34218E39
+_L 0x20146BC8 0x3C013FE3
+_L 0x20146BCC 0x34218E39
+_L 0x20147D90 0x3C013FE3
+_L 0x20147D94 0x34218E39
+_L 0x1015350C 0x00003F80
+```
+
+Having an explicit restore path is safer than assuming that disabling a cheat mid-session will immediately reconstruct every modified instruction.
+
+---
+
+## 13. Generalize the proven 20:9 method to other ratios
+
+Once the four projection paths were proven, supporting additional aspect ratios no longer required finding new projection code.
+
+The same four locations can be reused while changing only the IEEE-754 aspect-ratio constant.
+
+For each ratio:
+
+```text
+ratio = width / height
+```
+
+Convert that value to IEEE-754 single precision, split it into upper and lower 16-bit halves, then preserve the same MIPS instruction structure:
+
+```asm
+lui  $at, upper
+ori  $at, $at, lower
+```
+
+The current repository contains:
+
+| Ratio | Decimal | IEEE-754 | `lui` | `ori` |
+| --- | ---: | --- | --- | --- |
+| 21:9 | 2.3333333 | `0x40155555` | `0x3C014015` | `0x34215555` |
+| 20:9 | 2.2222223 | `0x400E38E4` | `0x3C01400E` | `0x342138E4` |
+| 19.5:9 | 2.1666667 | `0x400AAAAB` | `0x3C01400A` | `0x3421AAAB` |
+| 19:9 | 2.1111112 | `0x40071C72` | `0x3C014007` | `0x34211C72` |
+| 18.5:9 | 2.0555556 | `0x40038E39` | `0x3C014003` | `0x34218E39` |
+| 18:9 / 2:1 | 2.0000000 | `0x40000000` | `0x3C014000` | `0x34210000` |
+| 16:9 | 1.7777778 | `0x3FE38E39` | `0x3C013FE3` | `0x34218E39` |
+| 16:10 | 1.6000000 | `0x3FCCCCCD` | `0x3C013FCC` | `0x3421CCCD` |
+| 4:3 | 1.3333334 | `0x3FAAAAAB` | `0x3C013FAA` | `0x3421AAAB` |
+
+Those are the exact values in the current `ULUS10466.ini`.
+
+### Example: 21:9
+
+```text
+21 / 9
+= 2.3333333
+= 0x40155555
+```
+
+Split into:
+
+```text
+upper = 0x4015
+lower = 0x5555
+```
+
+Result:
+
+```text
+3C014015
+34215555
+```
+
+The same four projection sites are then patched with those words.
+
+---
+
+## 14. Python as a reproducible analysis helper
+
+The exact helper tooling used during the first discovery pass is not part of this repository. The following Python snippets reproduce the useful analysis steps: identifying MIPS instruction pairs that construct plausible aspect-ratio floats and generating replacement values once a projection path has been confirmed.
+
+### Candidate scanner
+
+For an already decrypted `EBOOT.BIN`, a simple scanner can walk aligned MIPS words and look for a `lui` followed by an `ori` that uses the same register.
 
 ```python
 import struct
@@ -113,26 +621,20 @@ def bits_to_float(bits):
 
 
 for offset in range(0, len(data) - 8, 4):
-    # PSP MIPS instructions are little-endian.
     word1 = struct.unpack_from("<I", data, offset)[0]
     word2 = struct.unpack_from("<I", data, offset + 4)[0]
 
-    # Decode fields from the first instruction.
     op1 = (word1 >> 26) & 0x3F
     rs1 = (word1 >> 21) & 0x1F
     rt1 = (word1 >> 16) & 0x1F
     imm1 = word1 & 0xFFFF
 
-    # Decode fields from the second instruction.
     op2 = (word2 >> 26) & 0x3F
     rs2 = (word2 >> 21) & 0x1F
     rt2 = (word2 >> 16) & 0x1F
     imm2 = word2 & 0xFFFF
 
-    # LUI rt, immediate
     is_lui = op1 == 0x0F and rs1 == 0
-
-    # ORI rt, rt, immediate
     is_ori_same_register = (
         op2 == 0x0D
         and rs2 == rt1
@@ -158,127 +660,13 @@ for offset in range(0, len(data) - 8, 4):
             )
 ```
 
-This does not require knowing the final Tekken 6 instruction pair beforehand. It recognizes the instruction structure first, reconstructs the constant, and then asks whether that constant looks like an aspect ratio.
+This is only a candidate finder. It does not prove that a matching value controls projection.
 
-A broader version can also print any reconstructed float in a plausible range, such as:
+For better accuracy, restrict analysis to executable sections/segments and inspect surrounding disassembly.
 
-```python
-if 1.2 <= value <= 3.0:
-    print(...)
-```
+### Ratio/instruction generator
 
-Those results can be ranked by distance from common aspect ratios. This is useful when a game uses a nearby projection constant instead of an exact conventional ratio.
-
-The scanner is a candidate finder, not proof. False positives are possible, especially when scanning an entire binary rather than only executable code sections.
-
-## 4. Identify the Tekken 6 candidates
-
-For Tekken 6, the relevant candidates reconstruct the original 16:9 value:
-
-```text
-0x3FE38E39
-= 1.777777791...
-≈ 16 / 9
-```
-
-using the instruction pair:
-
-```text
-3C013FE3
-34218E39
-```
-
-The released cheat patches four occurrences:
-
-```text
-CWCheat offsets
-
-0x00145F10 / 0x00145F14
-0x00146794 / 0x00146798
-0x00146BC8 / 0x00146BCC
-0x00147D90 / 0x00147D94
-```
-
-In PSP user memory, those correspond to:
-
-```text
-0x08945F10 / 0x08945F14
-0x08946794 / 0x08946798
-0x08946BC8 / 0x08946BCC
-0x08947D90 / 0x08947D94
-```
-
-At the original 16:9 setting, each pair reconstructs the same float.
-
-### Mapping EBOOT results to runtime addresses
-
-If a candidate was found in the decrypted EBOOT, its file offset must first be mapped through the executable's loaded segment layout to determine the corresponding PSP virtual address.
-
-Do not assume:
-
-```text
-EBOOT offset 0x00145F10
-=
-PSP address 0x08945F10
-```
-
-That relationship is only valid if the file layout and loaded memory layout happen to line up in that way. The runtime address should be confirmed using the executable's segment mapping or by locating the same instruction sequence in PPSSPP memory/disassembly.
-
-Once the runtime addresses are confirmed, they can be converted into CWCheat offsets.
-
-## 5. Validate the candidates in PPSSPP
-
-Finding several matching 16:9 instruction sequences is only candidate discovery. It does not prove that every occurrence controls projection.
-
-The next step is controlled runtime experimentation.
-
-A useful temporary test value is 2:1 because its IEEE-754 representation is simple:
-
-```text
-2.0 = 0x40000000
-```
-
-Using the same instruction pattern gives:
-
-```asm
-lui  $at, 0x4000
-ori  $at, $at, 0x0000
-```
-
-Machine code:
-
-```text
-3C014000
-34210000
-```
-
-Candidate locations can then be patched individually or in groups while the game is running.
-
-The goal is to determine whether the 3D projection changes in a way consistent with an aspect-ratio adjustment rather than an unrelated gameplay or rendering variable.
-
-Useful states to test include:
-
-- normal gameplay
-- multiple stages
-- round intros and transitions
-- replays
-- other scenes that may initialize or use a different projection path
-
-If changing one occurrence affects only some scenes, that is evidence that other matching paths may also need to be patched. The released Tekken 6 cheat modifies all four confirmed occurrences so the correction remains consistent across the relevant rendering paths.
-
-## 6. Generate target ratios with Python
-
-Once the candidate instructions are confirmed to control the projection, the final replacement values are no longer guesses.
-
-For each target aspect ratio:
-
-```text
-ratio = width / height
-```
-
-Python can convert the ratio to an IEEE-754 single-precision value and preserve the original `lui` / `ori` instruction structure.
-
-A compact generator is:
+Once a projection path is confirmed, exact replacement instructions can be generated mechanically:
 
 ```python
 import struct
@@ -301,9 +689,6 @@ for name, ratio in RATIOS.items():
     upper = (bits >> 16) & 0xFFFF
     lower = bits & 0xFFFF
 
-    # Preserve Tekken 6's original register/instruction pattern:
-    # lui $at, upper
-    # ori $at, $at, lower
     lui = 0x3C010000 | upper
     ori = 0x34210000 | lower
 
@@ -315,240 +700,134 @@ for name, ratio in RATIOS.items():
     )
 ```
 
-For the ratios included in this project, that produces:
+---
 
-| Ratio | Decimal value | IEEE-754 | `lui` | `ori` |
-| --- | ---: | --- | --- | --- |
-| 21:9 | 2.3333333 | `0x40155555` | `0x3C014015` | `0x34215555` |
-| 20:9 | 2.2222223 | `0x400E38E4` | `0x3C01400E` | `0x342138E4` |
-| 19.5:9 | 2.1666667 | `0x400AAAAB` | `0x3C01400A` | `0x3421AAAB` |
-| 19:9 | 2.1111112 | `0x40071C72` | `0x3C014007` | `0x34211C72` |
-| 18.5:9 | 2.0555556 | `0x40038E39` | `0x3C014003` | `0x34218E39` |
-| 18:9 / 2:1 | 2.0000000 | `0x40000000` | `0x3C014000` | `0x34210000` |
-| 16:9 | 1.7777778 | `0x3FE38E39` | `0x3C013FE3` | `0x34218E39` |
-| 16:10 | 1.6000000 | `0x3FCCCCCD` | `0x3C013FCC` | `0x3421CCCD` |
-| 4:3 | 1.3333334 | `0x3FAAAAAB` | `0x3C013FAA` | `0x3421AAAB` |
+## 15. Reusable workflow for another PSP game
 
-These are the values in the released cheat.
+The Tekken 6 work suggests the following process for another 3D PSP title.
 
-## 7. Example: deriving the 20:9 patch
+1. Confirm the exact game ID, region, and revision.
+2. Obtain an original/decrypted `EBOOT.BIN`.
+3. Determine the game's stock aspect ratio.
+4. Calculate its expected IEEE-754 float.
+5. Search the executable for:
+   - the stock aspect-ratio float
+   - instructions constructing that float
+   - nearby projection-related constants
+6. Disassemble the surrounding MIPS code.
+7. Determine whether each candidate belongs to:
+   - perspective projection
+   - orthographic/UI rendering
+   - camera logic
+   - unrelated math
+8. Identify every 3D projection path that uses the candidate.
+9. Map EBOOT candidates to actual runtime PSP addresses before converting them to CWCheat offsets.
+10. Test an obvious temporary replacement while preserving the original instruction structure.
+11. Verify that characters retain their proportions and more horizontal geometry becomes visible.
+12. Test several stages, transitions, replays, effects, and other rendering states.
+13. Once confirmed, generate the exact target ratio and MIPS words.
+14. Record the original instructions before publishing the patch.
+15. Include an explicit restore entry.
+16. Treat camera/FOV changes separately from aspect correction.
+17. Treat HUD correction as a separate project unless the game exposes a clearly independent HUD transform.
 
-Take 20:9:
+### Use an extreme diagnostic value when useful
 
-```text
-20 / 9 = 2.2222222...
-IEEE-754 = 0x400E38E4
-```
+For future games, an exaggerated temporary ratio can make candidate validation easier than immediately jumping from 16:9 to a subtle target such as 20:9.
 
-Split the float bits into upper and lower halves:
+For example, temporarily testing something around `3.5:1` can make it obvious whether a candidate actually controls projection.
 
-```text
-upper = 0x400E
-lower = 0x38E4
-```
+If the 3D scene becomes extremely wide while maintaining the expected type of projection change, that is strong evidence that the correct path has been found.
 
-Substitute those into the same instruction structure used by the original code:
+Then replace the diagnostic value with the exact desired ratio.
 
-```asm
-lui  $at, 0x400E
-ori  $at, $at, 0x38E4
-```
+This is a recommended diagnostic technique for future work; it is not required by the released Tekken 6 patch itself.
 
-Machine code:
+---
 
-```text
-3C01400E
-342138E4
-```
+## Why this works better for 3D than for HUD/UI
 
-The final 20:9 entry writes those words to all four confirmed projection paths:
-
-```text
-_L 0x20145F10 0x3C01400E
-_L 0x20145F14 0x342138E4
-
-_L 0x20146794 0x3C01400E
-_L 0x20146798 0x342138E4
-
-_L 0x20146BC8 0x3C01400E
-_L 0x20146BCC 0x342138E4
-
-_L 0x20147D90 0x3C01400E
-_L 0x20147D94 0x342138E4
-```
-
-### 21:9 example
+A conventional 3D renderer ultimately needs projection parameters equivalent to concepts such as:
 
 ```text
-21 / 9 = 2.3333333
-IEEE-754 = 0x40155555
-
-upper = 0x4015
-lower = 0x5555
+field of view
+aspect ratio
+near plane
+far plane
 ```
 
-Which becomes:
+Even in lower-level PSP/MIPS code, some representation of that projection math usually has to exist.
+
+That creates identifiable targets such as:
 
 ```text
-3C014015
-34215555
+1.7777778
 ```
 
-These are the exact instruction values used by the released 21:9 entry.
+or the instructions that construct it.
 
-## 8. Convert confirmed runtime addresses into CWCheat writes
-
-For simple CWCheat patches, type `2` is a 32-bit write.
-
-When working from PSP user memory, CWCheat addresses are represented as offsets from `0x08800000`:
+A 2D UI can instead consist of many unrelated values:
 
 ```text
-cwcheat_offset = psp_address - 0x08800000
+sprite x
+sprite width
+text x
+health bar x
+health fill x
+overlay quad coordinates
 ```
 
-For example:
+There may be no single global HUD aspect-ratio control.
+
+Tekken 6 demonstrated that difference clearly: the 3D projection was corrected with four small instruction pairs, while HUD work spread into multiple rendering systems and produced regressions.
+
+---
+
+## Current repository state
+
+The current public `ULUS10466.ini` is the generalized version of the original 20:9 work.
+
+It contains:
+
+- nine selectable aspect ratios from 4:3 through 21:9
+- the same four confirmed 3D projection paths for every ratio
+- four optional camera presets
+- an explicit restore option
+- no experimental HUD modifications
+
+The core discovery remains the same:
 
 ```text
-PSP address:    0x08945F10
-CWCheat offset: 0x00145F10
-```
-
-A 32-bit write of `0x3C01400E` becomes:
-
-```text
-_L 0x20145F10 0x3C01400E
-```
-
-The leading `2` denotes the 32-bit write type; it is not part of the underlying offset.
-
-This conversion should only be done after the EBOOT candidate has been mapped to and verified at its actual runtime PSP address.
-
-## 9. Verify that the result is a real projection correction
-
-A value changing the image is not enough to prove that the correct parameter has been found.
-
-Testing is done with PPSSPP's **Stretch** option enabled so the PSP framebuffer fills the target display. The cheat then corrects the game's internal 3D projection for the same shape.
-
-A good result should:
-
-- restore normal character and world proportions instead of leaving a horizontally stretched image
-- reveal more horizontal 3D scene content as the target ratio becomes wider
-- behave consistently across the gameplay states using the patched paths
-- return cleanly to the original presentation when the 16:9 instructions are restored
-
-Testing several mathematically related ratios is also useful as a sanity check. If the patched value really is an aspect-ratio parameter, moving from 4:3 through 16:9, 2:1, 20:9, and 21:9 should produce a predictable progression rather than unrelated visual effects.
-
-## Why PPSSPP Stretch is still required
-
-The cheat changes the game's internal 3D projection constant. It does not itself resize PPSSPP's output surface.
-
-The intended combination is therefore:
-
-```text
-PPSSPP Stretch
-+
-matching aspect-ratio CWCheat
-```
-
-Stretch fills the display; the cheat corrects the 3D projection for that shape.
-
-## HUD limitation
-
-The original 2D HUD and menus are separate from the 3D projection paths described above. Correcting the 3D aspect ratio does not independently reposition or rescale those UI elements.
-
-That is why the released patch fixes the 3D presentation while retaining the documented HUD/menu limitation.
-
-A complete HUD fix would be a separate reverse-engineering task involving the game's 2D rendering, sprite coordinates, scaling, or orthographic projection logic.
-
-## Camera patch is separate
-
-The camera presets in `ULUS10466.ini` are not part of the aspect-ratio calculation above.
-
-They write a separate 16-bit value at CWCheat offset:
-
-```text
-0x0015350C
-```
-
-The released presets are:
-
-```text
-Original        0x3F80
-Slightly Wider  0x3F81
-Wider           0x3F82
-Widest          0x3F83
-```
-
-This changes gameplay framing independently of the projection correction. It should be treated as a separate camera adjustment rather than as part of the ultrawide aspect-ratio formula.
-
-## Reproducing the method for another PSP game
-
-The Tekken 6 process can be generalized, but the exact code structure will vary from game to game.
-
-A practical workflow is:
-
-1. Identify the game's normal aspect ratio and calculate its expected IEEE-754 float.
-2. Obtain a decrypted `EBOOT.BIN` for static analysis.
-3. Inspect the executable's segment layout so file offsets can later be mapped correctly into PSP virtual memory.
-4. Use Python to scan aligned MIPS instructions for patterns that construct plausible aspect-ratio floats instead of relying only on a raw-byte search.
-5. Rank or filter candidates by closeness to common ratios such as 4:3, 16:10, or 16:9.
-6. Record candidate EBOOT offsets, instruction words, and surrounding code.
-7. Map promising EBOOT candidates to their loaded PSP addresses and verify the same instructions in PPSSPP memory/disassembly.
-8. Generate an obvious temporary replacement ratio, such as 2:1, while preserving the original instruction/register structure.
-9. Test candidates in PPSSPP and observe whether the 3D projection changes correctly.
-10. Test across multiple gameplay/rendering states to find every path that must be patched.
-11. Once the projection paths are confirmed, use Python to generate exact IEEE-754 target values and replacement MIPS instructions.
-12. Convert the confirmed runtime PSP addresses into CWCheat offsets using the correct memory base and write type.
-13. Test several ratios and restoration values to confirm predictable behavior.
-14. Treat HUD scaling, culling, camera distance, FMVs, and other rendering issues as separate reverse-engineering problems unless testing shows they share the same code path.
-
-Some games will be easier and store a normal float directly in writable data. Others may use `lui` plus another instruction, separate X/Y scale constants, matrix coefficients, values regenerated every frame, or entirely different projection logic.
-
-The Python scanner should therefore be treated as a way to find and rank strong candidates, not as proof that a match is the game's aspect-ratio control. In-game validation is still required.
-
-## Useful references
-
-- PPSSPP process-hacking reference: https://www.ppsspp.org/docs/reference/process-hacks/
-- PPSSPP CWCheat syntax discussion explaining the `0x08800000` base and 32-bit type-2 writes: https://forums.ppsspp.org/showthread.php?tid=25041
-- Community PSP cheat-creation documentation: https://github.com/raing3/psp-cheat-documentation
-
-## Final result
-
-The Tekken 6 ultrawide patch can be reproduced through this workflow:
-
-```text
-decrypted EBOOT.BIN
-        ↓
-Python scans MIPS code for instructions constructing plausible ratio floats
-        ↓
-identify candidate 0x3FE38E39 / 16:9 instruction paths
-        ↓
-map EBOOT candidates to runtime PSP addresses
-        ↓
-test replacements in PPSSPP
-        ↓
-confirm the four relevant projection paths
-        ↓
-generate exact target float + MIPS values with Python
-        ↓
-convert confirmed runtime addresses to CWCheat entries
-        ↓
-validate multiple ratios in-game
-```
-
-For Tekken 6, the confirmed original projection constant is:
-
-```text
+Original 16:9 float
 0x3FE38E39
-```
 
-and the relevant code reconstructs it as:
-
-```text
+MIPS construction
 3C013FE3
 34218E39
 ```
 
-Replacing those immediate values with the IEEE-754 representation of the target `width / height` ratio produces the aspect-ratio entries in `ULUS10466.ini`.
+Changing only those immediate values to the IEEE-754 representation of another `width / height` ratio produces the aspect-ratio entries in the released cheat.
 
-The released cheat patches all four confirmed projection paths and keeps the camera adjustment separate.
+The most important development lesson was also simple:
+
+```text
+find the 3D projection constant
+        ↓
+verify every relevant path
+        ↓
+replace the stock 16:9 value
+with the exact target ratio
+        ↓
+validate the wider 3D result
+        ↓
+leave unrelated rendering systems alone
+unless they can be corrected independently and safely
+```
+
+---
+
+## Useful references
+
+- PPSSPP process-hacking reference: https://www.ppsspp.org/docs/reference/process-hacks/
+- PPSSPP CWCheat syntax discussion: https://forums.ppsspp.org/showthread.php?tid=25041
+- Community PSP cheat-creation documentation: https://github.com/raing3/psp-cheat-documentation
