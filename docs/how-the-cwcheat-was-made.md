@@ -1,12 +1,12 @@
 # How the Tekken 6 Ultrawide CWCheat Was Made
 
-This document explains the reverse-engineering method behind the aspect-ratio portion of this project's Tekken 6 CWCheat for the USA release (`ULUS10466`).
+This document explains a reproducible reverse-engineering workflow behind the aspect-ratio portion of this project's Tekken 6 CWCheat for the USA release (`ULUS10466`).
 
 ## What the patch is actually changing
 
 PPSSPP can stretch the final PSP framebuffer to fill a wider display, but that alone does not change the game's internal 3D projection. Without correcting the projection, the image is simply stretched horizontally.
 
-The goal was therefore to find how Tekken 6 represents its normal 16:9 projection inside PSP/MIPS code, identify the code paths that use it, and replace that value with another target aspect ratio.
+The goal is therefore to find how Tekken 6 represents its normal 16:9 projection inside PSP/MIPS code, identify the code paths that use it, and replace that value with another target aspect ratio.
 
 For the original widescreen projection:
 
@@ -20,15 +20,15 @@ As an IEEE-754 single-precision float:
 1.7777778 = 0x3FE38E39
 ```
 
-That numerical signature gives us something useful to search for, but the important part of the process is that we do not assume in advance how the game stores or constructs it.
+That numerical signature gives us something useful to search for, but the important part of the process is not to assume in advance how the game stores or constructs it.
 
 ## 1. Start from the mathematical signature of 16:9
 
-A straightforward first thought is to search memory or an executable for the raw bytes representing `0x3FE38E39`.
+A straightforward first thought is to search the game's executable or runtime memory for the raw bytes representing `0x3FE38E39`.
 
-That can work for games that store the aspect ratio as a normal float in a data table, but Tekken 6's projection paths patched here reconstruct the value in MIPS instructions instead.
+That can work for games that store the aspect ratio as a normal float in a data table, but the Tekken 6 projection paths patched here reconstruct the value in MIPS instructions instead.
 
-The final code uses this pair:
+The confirmed code uses this pair:
 
 ```asm
 lui  $at, 0x3FE3
@@ -51,26 +51,44 @@ The two 16-bit immediates reconstruct:
 ≈ 16:9
 ```
 
-The useful reverse-engineering task is therefore not simply "search for `3C013FE3 34218E39`." Before that pattern is known, a script can scan MIPS code for instruction pairs that construct plausible floating-point constants and flag values close to common aspect ratios.
+The useful reverse-engineering task is therefore not simply to search for `3C013FE3 34218E39`. Before that pattern is known, code can be scanned for instruction sequences that construct plausible floating-point constants and then ranked against common aspect ratios.
 
-## 2. Use Python to scan MIPS code for candidate aspect-ratio constants
+## 2. Use a decrypted EBOOT.BIN for static analysis
 
-A practical way to reduce manual searching is to let Python walk through a PPSSPP memory dump or another correctly mapped copy of the game's executable code four bytes at a time.
+A useful static-analysis input is the game's decrypted `EBOOT.BIN`. PPSSPP can produce a decrypted executable for analysis, giving access to the PSP/MIPS machine code without having to inspect every instruction manually while the game is running.
 
-The scanner can look for the general MIPS pattern:
+The important distinction is that an `EBOOT.BIN` file offset is not automatically a runtime PSP address or a CWCheat offset.
+
+```text
+EBOOT file offset
+        ↓
+map executable segment into PSP virtual memory
+        ↓
+runtime PSP address
+        ↓
+convert to CWCheat offset
+```
+
+The EBOOT is therefore most useful for discovering candidate instructions. Runtime memory or the PPSSPP debugger is then used to confirm where those instructions are loaded and whether changing them actually affects the projection.
+
+For quick triage, a script can scan the binary on 4-byte boundaries. For more precise analysis, restrict the scan to executable sections or segments rather than treating every byte in the file as code.
+
+## 3. Use Python to discover candidate MIPS aspect-ratio constants
+
+Python can walk through the decrypted EBOOT's MIPS instructions and look for the general pattern:
 
 ```asm
 lui  register, HIGH16
 ori  same_register, same_register, LOW16
 ```
 
-For every pair that matches, it reconstructs the 32-bit value:
+For every matching pair it can reconstruct the 32-bit value:
 
 ```text
 (HIGH16 << 16) | LOW16
 ```
 
-Then it interprets those bits as an IEEE-754 float and compares the result against likely aspect-ratio values such as 4:3, 16:10, 16:9, 2:1, 20:9, or 21:9.
+The reconstructed bits can then be interpreted as an IEEE-754 float and compared against common aspect ratios such as 4:3, 16:10, 16:9, 2:1, 20:9, and 21:9.
 
 A minimal scanner looks like this:
 
@@ -86,7 +104,7 @@ TARGET_RATIOS = {
     "21:9": 21 / 9,
 }
 
-with open("memory.bin", "rb") as f:
+with open("EBOOT.BIN", "rb") as f:
     data = f.read()
 
 
@@ -95,7 +113,7 @@ def bits_to_float(bits):
 
 
 for offset in range(0, len(data) - 8, 4):
-    # PSP MIPS instructions in memory are little-endian.
+    # PSP MIPS instructions are little-endian.
     word1 = struct.unpack_from("<I", data, offset)[0]
     word2 = struct.unpack_from("<I", data, offset + 4)[0]
 
@@ -111,10 +129,10 @@ for offset in range(0, len(data) - 8, 4):
     rt2 = (word2 >> 16) & 0x1F
     imm2 = word2 & 0xFFFF
 
-    # LUI has opcode 0x0F and rs == 0.
+    # LUI rt, immediate
     is_lui = op1 == 0x0F and rs1 == 0
 
-    # ORI has opcode 0x0D. Here we want ORI rt, rt, immediate.
+    # ORI rt, rt, immediate
     is_ori_same_register = (
         op2 == 0x0D
         and rs2 == rt1
@@ -134,17 +152,26 @@ for offset in range(0, len(data) - 8, 4):
     for name, ratio in TARGET_RATIOS.items():
         if abs(value - ratio) < 0.00001:
             print(
-                f"offset=0x{offset:08X} "
+                f"file_offset=0x{offset:08X} "
                 f"words={word1:08X} {word2:08X} "
                 f"float={value:.9f} candidate={name}"
             )
 ```
 
-This is useful because it does not require knowing the final Tekken 6 instruction pair beforehand. It recognizes the instruction structure first, reconstructs the constant, and then asks whether that constant looks like an aspect ratio.
+This does not require knowing the final Tekken 6 instruction pair beforehand. It recognizes the instruction structure first, reconstructs the constant, and then asks whether that constant looks like an aspect ratio.
 
-A broader version of the script can also print any reconstructed float in a plausible range, for example `1.2 <= value <= 3.0`, and rank results by their distance from known ratios. That helps when a game uses a nearby but not exact projection constant.
+A broader version can also print any reconstructed float in a plausible range, such as:
 
-## 3. The Tekken 6 candidates
+```python
+if 1.2 <= value <= 3.0:
+    print(...)
+```
+
+Those results can be ranked by distance from common aspect ratios. This is useful when a game uses a nearby projection constant instead of an exact conventional ratio.
+
+The scanner is a candidate finder, not proof. False positives are possible, especially when scanning an entire binary rather than only executable code sections.
+
+## 4. Identify the Tekken 6 candidates
 
 For Tekken 6, the relevant candidates reconstruct the original 16:9 value:
 
@@ -154,7 +181,7 @@ For Tekken 6, the relevant candidates reconstruct the original 16:9 value:
 ≈ 16 / 9
 ```
 
-and use the instruction pair:
+using the instruction pair:
 
 ```text
 3C013FE3
@@ -172,7 +199,7 @@ CWCheat offsets
 0x00147D90 / 0x00147D94
 ```
 
-If the scanned input is a RAM dump mapped from PSP user-memory base `0x08800000`, those offsets correspond to these PSP virtual addresses:
+In PSP user memory, those correspond to:
 
 ```text
 0x08945F10 / 0x08945F14
@@ -183,15 +210,29 @@ If the scanned input is a RAM dump mapped from PSP user-memory base `0x08800000`
 
 At the original 16:9 setting, each pair reconstructs the same float.
 
-> Important: if you scan an extracted `EBOOT.BIN` instead of a memory dump, file offsets do not automatically equal PSP virtual addresses or CWCheat offsets. The mapping must be resolved correctly before converting results into cheats.
+### Mapping EBOOT results to runtime addresses
 
-Finding several matching occurrences is only candidate discovery. It does not prove that every occurrence controls projection.
+If a candidate was found in the decrypted EBOOT, its file offset must first be mapped through the executable's loaded segment layout to determine the corresponding PSP virtual address.
 
-## 4. Validate the candidates in PPSSPP
+Do not assume:
 
-The next step is controlled experimentation.
+```text
+EBOOT offset 0x00145F10
+=
+PSP address 0x08945F10
+```
 
-A good temporary test value is 2:1 because its IEEE-754 representation is simple:
+That relationship is only valid if the file layout and loaded memory layout happen to line up in that way. The runtime address should be confirmed using the executable's segment mapping or by locating the same instruction sequence in PPSSPP memory/disassembly.
+
+Once the runtime addresses are confirmed, they can be converted into CWCheat offsets.
+
+## 5. Validate the candidates in PPSSPP
+
+Finding several matching 16:9 instruction sequences is only candidate discovery. It does not prove that every occurrence controls projection.
+
+The next step is controlled runtime experimentation.
+
+A useful temporary test value is 2:1 because its IEEE-754 representation is simple:
 
 ```text
 2.0 = 0x40000000
@@ -213,7 +254,7 @@ Machine code:
 
 Candidate locations can then be patched individually or in groups while the game is running.
 
-The goal is to observe whether the 3D projection changes in a way that is consistent with an aspect-ratio adjustment rather than an unrelated gameplay or rendering variable.
+The goal is to determine whether the 3D projection changes in a way consistent with an aspect-ratio adjustment rather than an unrelated gameplay or rendering variable.
 
 Useful states to test include:
 
@@ -225,7 +266,7 @@ Useful states to test include:
 
 If changing one occurrence affects only some scenes, that is evidence that other matching paths may also need to be patched. The released Tekken 6 cheat modifies all four confirmed occurrences so the correction remains consistent across the relevant rendering paths.
 
-## 5. Generate target ratios with Python
+## 6. Generate target ratios with Python
 
 Once the candidate instructions are confirmed to control the projection, the final replacement values are no longer guesses.
 
@@ -260,7 +301,7 @@ for name, ratio in RATIOS.items():
     upper = (bits >> 16) & 0xFFFF
     lower = bits & 0xFFFF
 
-    # Preserve the original Tekken 6 register/instruction pattern:
+    # Preserve Tekken 6's original register/instruction pattern:
     # lui $at, upper
     # ori $at, $at, lower
     lui = 0x3C010000 | upper
@@ -290,7 +331,7 @@ For the ratios included in this project, that produces:
 
 These are the values in the released cheat.
 
-## 6. Example: deriving the 20:9 patch
+## 7. Example: deriving the 20:9 patch
 
 Take 20:9:
 
@@ -353,9 +394,9 @@ Which becomes:
 34215555
 ```
 
-Again, these are the exact instruction values used by the released 21:9 entry.
+These are the exact instruction values used by the released 21:9 entry.
 
-## 7. Convert confirmed addresses into CWCheat writes
+## 8. Convert confirmed runtime addresses into CWCheat writes
 
 For simple CWCheat patches, type `2` is a 32-bit write.
 
@@ -380,7 +421,9 @@ _L 0x20145F10 0x3C01400E
 
 The leading `2` denotes the 32-bit write type; it is not part of the underlying offset.
 
-## 8. Verify that the result is a real projection correction
+This conversion should only be done after the EBOOT candidate has been mapped to and verified at its actual runtime PSP address.
+
+## 9. Verify that the result is a real projection correction
 
 A value changing the image is not enough to prove that the correct parameter has been found.
 
@@ -445,17 +488,19 @@ The Tekken 6 process can be generalized, but the exact code structure will vary 
 A practical workflow is:
 
 1. Identify the game's normal aspect ratio and calculate its expected IEEE-754 float.
-2. Obtain a correctly mapped PPSSPP memory dump or otherwise inspect the game's executable code.
-3. Use Python to scan aligned MIPS instructions for patterns that construct plausible aspect-ratio floats, rather than relying only on a raw-byte search.
-4. Rank or filter candidates by closeness to common ratios such as 4:3, 16:10, or 16:9.
-5. Record the candidate addresses and surrounding instructions.
-6. Generate an obvious temporary replacement ratio, such as 2:1, while preserving the original instruction/register structure.
-7. Test candidates in PPSSPP and observe whether the 3D projection changes correctly.
-8. Test across multiple gameplay/rendering states to find every path that must be patched.
-9. Once the projection paths are confirmed, use Python to generate exact IEEE-754 target values and replacement MIPS instructions.
-10. Convert confirmed PSP addresses into CWCheat offsets using the correct memory mapping and write type.
-11. Test several ratios and restoration values to confirm predictable behavior.
-12. Treat HUD scaling, culling, camera distance, FMVs, and other rendering issues as separate reverse-engineering problems unless testing shows they share the same code path.
+2. Obtain a decrypted `EBOOT.BIN` for static analysis.
+3. Inspect the executable's segment layout so file offsets can later be mapped correctly into PSP virtual memory.
+4. Use Python to scan aligned MIPS instructions for patterns that construct plausible aspect-ratio floats instead of relying only on a raw-byte search.
+5. Rank or filter candidates by closeness to common ratios such as 4:3, 16:10, or 16:9.
+6. Record candidate EBOOT offsets, instruction words, and surrounding code.
+7. Map promising EBOOT candidates to their loaded PSP addresses and verify the same instructions in PPSSPP memory/disassembly.
+8. Generate an obvious temporary replacement ratio, such as 2:1, while preserving the original instruction/register structure.
+9. Test candidates in PPSSPP and observe whether the 3D projection changes correctly.
+10. Test across multiple gameplay/rendering states to find every path that must be patched.
+11. Once the projection paths are confirmed, use Python to generate exact IEEE-754 target values and replacement MIPS instructions.
+12. Convert the confirmed runtime PSP addresses into CWCheat offsets using the correct memory base and write type.
+13. Test several ratios and restoration values to confirm predictable behavior.
+14. Treat HUD scaling, culling, camera distance, FMVs, and other rendering issues as separate reverse-engineering problems unless testing shows they share the same code path.
 
 Some games will be easier and store a normal float directly in writable data. Others may use `lui` plus another instruction, separate X/Y scale constants, matrix coefficients, values regenerated every frame, or entirely different projection logic.
 
@@ -469,14 +514,16 @@ The Python scanner should therefore be treated as a way to find and rank strong 
 
 ## Final result
 
-The Tekken 6 ultrawide patch was produced through a Python-assisted reverse-engineering workflow:
+The Tekken 6 ultrawide patch can be reproduced through this workflow:
 
 ```text
-known 16:9 mathematical signature
+decrypted EBOOT.BIN
         ↓
-scan MIPS code for instructions constructing plausible ratio floats
+Python scans MIPS code for instructions constructing plausible ratio floats
         ↓
 identify candidate 0x3FE38E39 / 16:9 instruction paths
+        ↓
+map EBOOT candidates to runtime PSP addresses
         ↓
 test replacements in PPSSPP
         ↓
@@ -484,7 +531,7 @@ confirm the four relevant projection paths
         ↓
 generate exact target float + MIPS values with Python
         ↓
-package them as CWCheat entries
+convert confirmed runtime addresses to CWCheat entries
         ↓
 validate multiple ratios in-game
 ```
