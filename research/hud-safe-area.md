@@ -123,15 +123,66 @@ Its main render branch invokes these component renderers in sequence:
 
 Because this is the class render method rather than update/gameplay logic, selectively suppressing one component call at a time is a much safer ownership diagnostic than hooking a global sprite primitive.
 
-## CMain path-map diagnostic v2
+## CMain path-map diagnostic v2 result
 
-`ULUS10466_HUD_CMAIN_MAP_v2.ini` maps the six `CMainTcb_t::Draw` component renderers above. Each test restores the other render calls and then suppresses exactly one component. MAP 6 replaces the final tail-call with `jr $ra`; its existing stack-restoration delay slot is preserved.
+`ULUS10466_HUD_CMAIN_MAP_v2.ini` suppressed the six `CMainTcb_t::Draw` component renderers one at a time. On-device testing showed that none of MAP 1 through MAP 6 hid the HP frame.
 
-The purpose is to identify which component owns the static HP-bar shell/background around the already-confirmed `CGaugeTcb_t` fill. Once the shell owner is identified, its internal packet submissions can be traced and corrected without touching the rest of the battle HUD.
+That rules out the direct `CMainTcb_t` component list as the owner of the static HP shell/background. The fill path remains independently proven through `CGaugeTcb_t`.
 
-## Paths deliberately excluded for now
+## Orthographic UI compositor lead
 
-Do not reuse the old global orthographic/projection edits around:
+The old broad HUD experiments modified three orthographic setup paths around:
+
+```text
+0x08863228
+0x0886345C
+0x08864490
+```
+
+Those experiments were too global, but the EBOOT now shows that the `0x08864490` path establishes the PSP-style 480x272 UI projection and then submits eight separate render groups through distinct calls:
+
+```text
+0x088644DC -> group 9
+0x088644E4 -> group 10
+0x088644F4 -> group 12
+0x08864500 -> group 13
+0x0886450C -> group 14
+0x08864518 -> group 15
+0x08864524 -> group 16
+0x08864530 -> group 17
+```
+
+The corresponding group helper functions are:
+
+```text
+0x08863524  group 9
+0x0886357C  group 10
+0x08863880  group 12
+0x0886391C  group 13
+0x088639B8  group 14
+0x08863A68  group 15
+0x08863AEC  group 16
+0x08863B9C  group 17
+```
+
+Each helper enters/exits one compositor group while preserving the shared orthographic projection. This makes the group-call sites a much narrower diagnostic surface than changing the projection itself.
+
+## Orthographic group-map diagnostic v3
+
+`ULUS10466_HUD_ORTHO_GROUP_MAP_v3.ini` restores all eight compositor calls and then suppresses exactly one group per test.
+
+The test does not alter:
+
+- the v1.1.0 3D aspect correction;
+- the confirmed `CGaugeTcb_t` HP-fill path;
+- the orthographic projection constants;
+- unrelated executable regions.
+
+The goal is simply to determine whether one compositor group owns the static HP frame/trough. If one group removes the frame while leaving the fill, its internal draw packets can then be traced and corrected independently.
+
+## Paths deliberately excluded from direct correction for now
+
+Do not reapply the old global orthographic/projection modifications themselves:
 
 ```text
 0x08863228
@@ -140,13 +191,13 @@ Do not reuse the old global orthographic/projection edits around:
 0x08864B74..0x08864C18
 ```
 
-Those paths were too broad and previously caused pause-overlay loss, rectangular artifacts, and unrelated UI corruption.
+Those paths were previously associated with pause-overlay loss, rectangular artifacts, and unrelated UI corruption. They are useful only as structural leads while we isolate narrower child render paths.
 
 ## Final correction strategy
 
 Once both ownership paths are proven:
 
 1. Apply the centered-safe-area packet transform only to the two `CGaugeTcb_t` HP-fill instances.
-2. Apply the same transform only to the proven static HP-frame/background component.
+2. Apply the same transform only to the proven static HP-frame/background path.
 3. Leave the 3D projection, menus, pause UI, and unrelated fight HUD untouched.
 4. After a fixed 20:9 implementation is stable, derive `scale` and `offset` from the same PPSSPP display-aspect query already used by the v1.1.0 plugin.
