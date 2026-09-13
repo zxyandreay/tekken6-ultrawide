@@ -20,14 +20,23 @@ These retain the proven camera writes from the public v1.0.0 release at `0x10153
 
 ## Aspect-ratio development status
 
-The first automatic-aspect candidates did not correct the 3D scene. Device testing of `v1.1.0-dev3` then isolated the issue by removing the PPSSPP emulator API/syscall path and hardcoding the already-proven 20:9 projection value.
+Device testing established the following sequence:
 
-`v1.1.0-dev3` worked on-device. That confirms:
+- `v1.1.0-dev1/dev2`: automatic aspect candidates failed to correct the 3D scene.
+- `v1.1.0-dev3`: removed the PPSSPP aspect-query path and hardcoded the proven 20:9 projection value. This worked on-device.
+- `v1.1.0-dev4`: kept the exact dev3 PRX and moved camera selection into a camera-only CWCheat file. This also worked on-device.
+- `v1.1.0-dev5`: restores automatic PPSSPP display-aspect detection with the failed test-build ABI issue corrected.
+
+The dev1/dev2 failure is now understood. PPSSPP's HLE wrapper for `sceIoDevctl` reads six integer/pointer arguments from PSP registers `$a0`, `$a1`, `$a2`, `$a3`, `$t0`, and `$t1`. The temporary non-PSPDEV build path used generic MIPS o32, which placed arguments 5 and 6 on the stack instead. As a result, PPSSPP did not receive the `GET_ASPECT_RATIO` output pointer/length correctly.
+
+The dev5 diagnostic build adds a tiny ABI bridge that copies generic-o32 stack arguments 5/6 into `$t0/$t1` before calling the imported `sceIoDevctl` stub. Production builds should not need this bridge: the canonical repository source remains normal PSPSDK C and is intended to be built with PSPDEV.
+
+The successful dev3/dev4 tests already confirm:
 
 - the four ULUS10466 projection addresses are correct;
 - direct PRX memory patching works;
 - the 20:9 projection words `0x3C01400E / 0x342138E4` behave identically to the proven CWCheat;
-- the remaining work for the aspect plugin is reliable automatic display-aspect detection/build integration, not new Tekken projection addresses.
+- camera CWCheats can remain fully separate from the PRX.
 
 ## Intended v1.1.0 package layout
 
