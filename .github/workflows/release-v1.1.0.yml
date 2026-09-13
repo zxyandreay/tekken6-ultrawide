@@ -1,0 +1,83 @@
+name: Publish v1.1.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release-v1.1.0.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v1.1.0
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: v1.1.0
+      ASSET: Tekken6-Ultrawide-v1.1.0.zip
+      PRX_SHA256: 5756c9e5b4dfb82c5785b91adc9778c2d1f69b8023fe9fdf6bff248d6886d4fd
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Restore validated PRX
+        run: |
+          base64 --decode release/v1.1.0/Tekken6Ultrawide.prx.b64 > /tmp/Tekken6Ultrawide.prx
+          echo "$PRX_SHA256  /tmp/Tekken6Ultrawide.prx" | sha256sum --check --strict
+
+      - name: Package v1.1.0
+        run: |
+          python tools/package_plugin.py \
+            --prx /tmp/Tekken6Ultrawide.prx \
+            --output "$ASSET"
+          sha256sum "$ASSET" > "$ASSET.sha256"
+          unzip -l "$ASSET"
+
+      - name: Write release notes
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          # Tekken 6 Ultrawide v1.1.0
+
+          v1.1.0 replaces the manual aspect-ratio selection from v1.0.0 with an automatic PPSSPP plugin for **Tekken 6 USA (`ULUS10466`)**.
+
+          ## Highlights
+
+          - Automatically detects PPSSPP's current landscape display aspect ratio.
+          - Corrects Tekken 6's 3D projection without choosing a manual aspect-ratio CWCheat.
+          - Keeps camera preferences as simple CWCheat presets in PPSSPP's normal Cheats menu.
+          - Includes `Original`, `Slightly Wider`, `Wider`, and `Widest` camera choices.
+          - Uses the exact automatic-aspect PRX validated on-device during v1.1.0 development.
+
+          ## Installation
+
+          Extract the ZIP into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder. Keep **Stretch** enabled under PPSSPP's display layout settings. If you already have custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up or merge the camera entries manually.
+
+          Do not enable the old v1.0.0 manual aspect-ratio CWCheats together with the v1.1.0 plugin.
+
+          ## Compatibility
+
+          This release targets **Tekken 6 USA (`ULUS10466`)**. Other regional versions are not supported.
+
+          ## Current limitation
+
+          The 3D scene is aspect-corrected automatically. Tekken 6's original 2D HUD and menus are still stretched; HUD correction remains future work.
+          EOF
+
+      - name: Publish GitHub release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+          else
+            gh release create "$TAG" \
+              "$ASSET" \
+              "$ASSET.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "Tekken 6 Ultrawide v1.1.0" \
+              --notes-file /tmp/release-notes.md
+          fi
