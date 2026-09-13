@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - ".github/workflows/release-v1.1.0.yml"
+  issues:
+    types:
+      - opened
 
 permissions:
   contents: write
@@ -16,6 +19,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.event_name == 'push' || (github.event_name == 'issues' && github.event.issue.title == '[release] v1.1.0')
     runs-on: ubuntu-latest
     env:
       TAG: v1.1.0
@@ -25,6 +29,8 @@ jobs:
     steps:
       - name: Check out main
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Restore validated PRX
         run: |
@@ -77,7 +83,7 @@ jobs:
             gh release create "$TAG" \
               "$ASSET" \
               "$ASSET.sha256" \
-              --target "$GITHUB_SHA" \
+              --target main \
               --title "Tekken 6 Ultrawide v1.1.0" \
               --notes-file /tmp/release-notes.md
           fi
