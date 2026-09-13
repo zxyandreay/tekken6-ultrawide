@@ -1,25 +1,53 @@
-# Tekken 6 Ultrawide Auto Aspect — v1.1.0 development build
+# Tekken 6 Ultrawide — v1.1.0 development
 
-This research branch converts the existing ULUS10466 projection CWCheat from the public v1.0.0 release into a PPSSPP PRX plugin with automatic display-aspect detection.
+The next release separates responsibilities to keep installation and day-to-day use simple:
 
-## Current milestone
+- `Tekken6Ultrawide.prx` handles the 3D aspect-ratio correction.
+- `PSP/Cheats/ULUS10466.ini` contains camera presets only.
+- Camera selection stays in PPSSPP's normal Cheat menu; no plugin INI editing is required.
+- The v1.1 package intentionally does not include manual aspect-ratio CWCheats, avoiding conflicts with the plugin.
 
-- Queries PPSSPP for the current landscape display aspect ratio.
-- Converts the exact returned float into Tekken 6's existing `lui $at` / `ori $at,$at` projection constant.
-- Patches only the four previously validated 3D projection paths.
-- Leaves the camera and all HUD/menu rendering untouched.
-- Refuses to patch if any projection pair does not match stock 16:9 or the already-computed target.
+## Camera presets
 
-## v1.1.0-dev2 fix
+Enable only one camera preset at a time in PPSSPP:
 
-The first test candidate incorrectly treated `PPSSPP_DEVCTL_IS_EMULATOR` as an output-value query and waited for PPSSPP to write `1` into a buffer. PPSSPP's API actually reports emulator presence through the devctl return code: `0` means the command is supported/running under PPSSPP. The bad check caused the plugin to exit before applying any Tekken projection patch.
+- Camera - Original (Default)
+- Camera - Slightly Wider
+- Camera - Wider
+- Camera - Widest
 
-## Test setup
+These retain the proven camera writes from the public v1.0.0 release at `0x1015350C`.
 
-1. Disable every Tekken 6 aspect-ratio CWCheat entry. Keep camera cheats disabled for this isolated test.
-2. Replace the previous test plugin folder with the new `PSP/PLUGINS/Tekken6Ultrawide/` folder.
-3. Enable the plugin for Tekken 6 if PPSSPP does not enable it automatically.
-4. Keep PPSSPP display scaling set to **Stretch**.
-5. Launch USA Tekken 6 (`ULUS10466`) in landscape orientation from a normal cold boot.
+## Aspect-ratio development status
 
-Expected result on a 2400×1080 / 20:9 display: the 3D scene should match the old 20:9 CWCheat automatically, while the HUD remains horizontally stretched. HUD correction is intentionally outside this milestone.
+The first automatic-aspect candidates did not correct the 3D scene. Device testing of `v1.1.0-dev3` then isolated the issue by removing the PPSSPP emulator API/syscall path and hardcoding the already-proven 20:9 projection value.
+
+`v1.1.0-dev3` worked on-device. That confirms:
+
+- the four ULUS10466 projection addresses are correct;
+- direct PRX memory patching works;
+- the 20:9 projection words `0x3C01400E / 0x342138E4` behave identically to the proven CWCheat;
+- the remaining work for the aspect plugin is reliable automatic display-aspect detection/build integration, not new Tekken projection addresses.
+
+## Intended v1.1.0 package layout
+
+```text
+PSP/
+├── Cheats/
+│   └── ULUS10466.ini
+└── PLUGINS/
+    └── Tekken6Ultrawide/
+        ├── Tekken6Ultrawide.prx
+        └── plugin.ini
+README-PLUGIN.md
+```
+
+## Usage
+
+1. Copy the package contents into the PPSSPP memory-stick root.
+2. Enable `Tekken 6 Ultrawide Auto Aspect` in PPSSPP's plugin manager if needed.
+3. Keep PPSSPP display scaling set to **Stretch**.
+4. Open PPSSPP's Cheats menu for Tekken 6 and enable exactly one camera preset if you want a non-default camera.
+5. Do not combine the v1.1 plugin with the old v1.0.0 manual aspect-ratio CWCheats.
+
+Target game: Tekken 6 USA (`ULUS10466`).
