@@ -9,7 +9,7 @@
 
 #include "aspect_math.h"
 
-PSP_MODULE_INFO("Tekken6Ultrawide", 0, 1, 0);
+PSP_MODULE_INFO("Tekken6Ultrawide", 0, 1, 1);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER);
 
 #define PPSSPP_EMULATOR_DEVICE "emulator:"
@@ -52,7 +52,6 @@ static void send_log(const char *message) {
 }
 
 static int query_ppsspp_aspect(float *aspect) {
-    uint32_t is_emulator = 0u;
     int result;
     if (aspect == NULL) {
         return 0;
@@ -62,9 +61,9 @@ static int query_ppsspp_aspect(float *aspect) {
                          PPSSPP_DEVCTL_IS_EMULATOR,
                          NULL,
                          0,
-                         &is_emulator,
-                         sizeof(is_emulator));
-    if (result < 0 || is_emulator != 1u) {
+                         NULL,
+                         0);
+    if (result != 0) {
         send_log("Tekken6 Ultrawide: PPSSPP emulator API unavailable; no patch applied.\n");
         return 0;
     }
@@ -163,7 +162,7 @@ int module_start(SceSize args, void *argp) {
     }
 
     snprintf(message, sizeof(message),
-             "Tekken6 Ultrawide v1.0.0: display aspect %.6f -> %08lx/%08lx\n",
+             "Tekken6 Ultrawide v1.1.0-dev: display aspect %.6f -> %08lx/%08lx\n",
              (double)aspect,
              (unsigned long)target_lui,
              (unsigned long)target_ori);
