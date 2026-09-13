@@ -52,47 +52,82 @@ Original call instruction at the candidate sites:
 0x0E2097AB    jal 0x08825EAC
 ```
 
-A previously tested narrow hook at `0x0892D56C` and `0x0892D5B0` affected the HP fill path, but not the complete bar assembly. Those two sites are retained as the diagnostic control.
+## Path-map diagnostic v1 result
 
-## Strong direct-draw candidates
+`ULUS10466_HUD_PATH_MAP_v1.ini` used a small wrapper that added `+32.0f` to packet X without changing width. On-device testing produced a decisive result:
 
-The repair history also identified eight additional direct calls to the same draw primitive that were touched during the old HUD investigation:
+- MAP 0 (`0x0892D56C`, `0x0892D5B0`) moved the visible HP fill.
+- MAP 1 through MAP 5 did nothing to the visible fight HUD.
 
-```text
-0x0893EE90
-0x0893EF04
-0x0893EF58
-0x0893EFBC
-0x0893F010
-0x0893F074
-0x08941524
-0x08944394
-```
+The old MAP 1-5 candidates are therefore discarded for the current milestone.
 
-The six calls in `0x0893EDAC..0x0893F078` form three highly regular sprite pairs. The resource IDs passed immediately before those draw calls are:
+## EBOOT RTTI breakthrough
+
+The ULUS10466 EBOOT retains C++ RTTI for the battle HUD. Relevant class names include:
 
 ```text
-Pair A: 0x12 / 0x0F
-Pair B: 0x13 / 0x10
-Pair C: 0x14 / 0x11
+tk::sprite::battle::CMainTcb_t
+tk::sprite::battle::CGaugeTcb_t
+tk::sprite::battle::CGaugeRageTcb_t
 ```
 
-This makes them strong candidates for paired P1/P2 HUD sub-elements, but ownership is not yet proven.
+This lets the research target the actual battle-gauge class hierarchy instead of generic 2D rendering paths.
 
-## Path-map diagnostic v1
+### CGaugeTcb_t
 
-`ULUS10466_HUD_PATH_MAP_v1.ini` intentionally does **not** apply the final safe-area correction. Instead it installs a tiny wrapper at `0x089EB858` that only adds `+32.0f` to packet X and then tail-calls the original draw primitive.
+The `CGaugeTcb_t` vtable points to its render method at:
 
-The tests are:
+```text
+0x0892C124
+```
 
-- MAP 0: known HP-fill path (`0x0892D56C`, `0x0892D5B0`)
-- MAP 1: pair `0x12 / 0x0F`
-- MAP 2: pair `0x13 / 0x10`
-- MAP 3: pair `0x14 / 0x11`
-- MAP 4: single draw at `0x08941524`
-- MAP 5: single draw at `0x08944394`
+Static disassembly shows that this method draws two gauge layers through `0x08928FF4`, using resource IDs `0x0E` and `0x0D`. That helper eventually reaches `0x0892D3E0`, whose final packet submission uses the already-proven MAP 0 calls:
 
-Only one mapping entry should be enabled at a time. The purpose is to identify exactly which HP frame/background/icon pieces move before introducing any scaling.
+```text
+0x0892D56C -> jal 0x08825EAC
+0x0892D5B0 -> jal 0x08825EAC
+```
+
+This explains the v1 result: MAP 0 is inside the real `CGaugeTcb_t` HP-fill render path.
+
+`CMainTcb_t` also constructs two `CGaugeTcb_t` instances, one with player index 0 and one with player index 1. The constructor path writes the `CGaugeTcb_t` vtable and stores the side index at object offset `+0x5C`.
+
+### CGaugeRageTcb_t
+
+The rage-gauge class has a separate render method at:
+
+```text
+0x0892C290
+```
+
+It is not part of the first HP-frame milestone unless later evidence shows that it owns an overlapping shell element.
+
+### CMainTcb_t
+
+The parent battle-HUD class has its render method at:
+
+```text
+0x0892BDAC
+```
+
+Its main render branch invokes these component renderers in sequence:
+
+```text
+0x08929A10
+0x0892A30C
+0x08929B60
+0x0892A5A4
+0x0892A7D0
+0x0892AE74  ; tail renderer
+```
+
+Because this is the class render method rather than update/gameplay logic, selectively suppressing one component call at a time is a much safer ownership diagnostic than hooking a global sprite primitive.
+
+## CMain path-map diagnostic v2
+
+`ULUS10466_HUD_CMAIN_MAP_v2.ini` maps the six `CMainTcb_t::Draw` component renderers above. Each test restores the other render calls and then suppresses exactly one component. MAP 6 replaces the final tail-call with `jr $ra`; its existing stack-restoration delay slot is preserved.
+
+The purpose is to identify which component owns the static HP-bar shell/background around the already-confirmed `CGaugeTcb_t` fill. Once the shell owner is identified, its internal packet submissions can be traced and corrected without touching the rest of the battle HUD.
 
 ## Paths deliberately excluded for now
 
@@ -107,6 +142,11 @@ Do not reuse the old global orthographic/projection edits around:
 
 Those paths were too broad and previously caused pause-overlay loss, rectangular artifacts, and unrelated UI corruption.
 
-## Next step after ownership is confirmed
+## Final correction strategy
 
-Once the screenshots identify which direct calls own the full HP assemblies, replace the diagnostic `+32 X` wrapper only on those calls with the real centered safe-area packet transform. After the fixed 20:9 version is stable, derive `scale` and `offset` from the same PPSSPP display-aspect query already used by the v1.1.0 plugin.
+Once both ownership paths are proven:
+
+1. Apply the centered-safe-area packet transform only to the two `CGaugeTcb_t` HP-fill instances.
+2. Apply the same transform only to the proven static HP-frame/background component.
+3. Leave the 3D projection, menus, pause UI, and unrelated fight HUD untouched.
+4. After a fixed 20:9 implementation is stable, derive `scale` and `offset` from the same PPSSPP display-aspect query already used by the v1.1.0 plugin.
