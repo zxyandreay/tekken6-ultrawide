@@ -1,14 +1,7 @@
 name: Publish v1.1.0
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/release-v1.1.0.yml"
-  issues:
-    types:
-      - opened
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,11 +12,11 @@ concurrency:
 
 jobs:
   release:
-    if: github.event_name == 'push' || (github.event_name == 'issues' && github.event.issue.title == '[release] v1.1.0')
     runs-on: ubuntu-latest
     env:
       TAG: v1.1.0
       ASSET: Tekken6-Ultrawide-v1.1.0.zip
+      ZIP_SHA256: 27b060e91559ae6b13c71ffb025418fc02647e892be5b84b5b558c1bee6c95c2
       PRX_SHA256: 5756c9e5b4dfb82c5785b91adc9778c2d1f69b8023fe9fdf6bff248d6886d4fd
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -32,16 +25,14 @@ jobs:
         with:
           ref: main
 
-      - name: Restore validated PRX
+      - name: Restore exact validated release archive
         run: |
-          base64 --decode release/v1.1.0/Tekken6Ultrawide.prx.b64 > /tmp/Tekken6Ultrawide.prx
-          echo "$PRX_SHA256  /tmp/Tekken6Ultrawide.prx" | sha256sum --check --strict
+          base64 --decode release/v1.1.0/Tekken6-Ultrawide-v1.1.0.zip.b64 > "$ASSET"
+          echo "$ZIP_SHA256  $ASSET" | sha256sum --check --strict
 
-      - name: Package v1.1.0
-        run: |
-          python tools/package_plugin.py \
-            --prx /tmp/Tekken6Ultrawide.prx \
-            --output "$ASSET"
+          ACTUAL_PRX_SHA256="$(unzip -p "$ASSET" PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx | sha256sum | awk '{print $1}')"
+          test "$ACTUAL_PRX_SHA256" = "$PRX_SHA256"
+
           sha256sum "$ASSET" > "$ASSET.sha256"
           unzip -l "$ASSET"
 
