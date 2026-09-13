@@ -44,10 +44,11 @@ README-PLUGIN.md
 
 ## Usage
 
-1. Copy the package contents into the PPSSPP memory-stick root.
-2. Enable `Tekken 6 Ultrawide Auto Aspect` in PPSSPP's plugin manager if needed.
-3. Keep PPSSPP display scaling set to **Stretch**.
-4. Open PPSSPP's Cheats menu for Tekken 6 and enable exactly one camera preset if you want a non-default camera.
-5. Do not combine the v1.1 plugin with the old v1.0.0 manual aspect-ratio CWCheats.
+1. If `PSP/Cheats/ULUS10466.ini` already contains unrelated custom cheats you want to keep, back it up before installing. PPSSPP uses one game-specific cheat INI for ULUS10466.
+2. Copy the package contents into the PPSSPP memory-stick root.
+3. Enable `Tekken 6 Ultrawide Auto Aspect` in PPSSPP's plugin manager if needed.
+4. Keep PPSSPP display scaling set to **Stretch**.
+5. Open PPSSPP's Cheats menu for Tekken 6 and enable exactly one camera preset if you want a non-default camera.
+6. Do not combine the v1.1 plugin with the old v1.0.0 manual aspect-ratio CWCheats.
 
 Target game: Tekken 6 USA (`ULUS10466`).
