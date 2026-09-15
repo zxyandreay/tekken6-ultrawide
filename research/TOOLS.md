@@ -6,7 +6,7 @@ Only tools that remain useful after the validated HUD findings are retained here
 
 Generic PPSSPP frame-dump parser/differ used to enumerate draw calls, decode vertices, compare draw groups, and correlate GPU geometry.
 
-It is the common parser used by the round-win analyzer.
+It is the common parser used by the focused HUD analyzers.
 
 ## `ppsspp_round_win_capture.mjs`
 
@@ -48,6 +48,34 @@ python research/tools/ppdmp_round_win_analysis.py .local-research/round-win/p2 -
 ```
 
 It writes `analysis.json` alongside the captures and groups identities across pre-KO, burst, and next-round phases.
+
+## `ppsspp_side_labels_capture.mjs`
+
+Read-only capture for the unresolved side-owned battle text. It records two stable active-fight frames each from Arcade, Story, and Ghost Battle without breakpoints or memory writes.
+
+Usage:
+
+```text
+node research/tools/ppsspp_side_labels_capture.mjs <host:port>
+```
+
+Captures are written under:
+
+```text
+.local-research/side-labels/
+```
+
+## `ppdmp_side_labels_analysis.py`
+
+Filters the side-label captures to stable top-HUD THROUGH draws and groups them into left, center, and right regions. The goal is to isolate character-name and battle-mode glyph batches without globally transforming text.
+
+It is run automatically by `ppsspp_side_labels_capture.mjs`, or manually with:
+
+```text
+python research/tools/ppdmp_side_labels_analysis.py .local-research/side-labels
+```
+
+The report is written to `.local-research/side-labels/analysis.json`.
 
 ## `verify_hud_hook_sites.py`
 
