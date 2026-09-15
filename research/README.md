@@ -12,14 +12,19 @@ The following behavior has been validated on-device:
 - rank badges and under-bar/lightning strips use side-aware horizontal anchoring;
 - persistent round markers and newly earned round orbs use the center transform;
 - the transient winner-orb glow is corrected independently of the ordinary orb rectangle;
-- P1 and P2 first-win orb placement and winner glow are both correct in the integrated plugin.
+- P1 and P2 first-win orb placement and winner glow are both correct in the integrated plugin;
+- the large center round countdown is horizontally de-stretched and centered through a timer-specific scope around its two digit submissions.
 
-The winner-orb subsystem is considered solved. Timer/front-end/character-select work is not part of that conclusion.
+The winner-orb and center-round-timer subsystems are considered solved and should remain frozen unless a regression is demonstrated.
+
+The next active fight-HUD target is side-owned battle text: character names and battle-mode labels such as `ARCADE BATTLE`, `STORY BATTLE`, and `GHOST BATTLE`. These are separate from the already-corrected rank/strip/panel geometry.
 
 ## Documentation
 
-- [`HUD_RESEARCH.md`](HUD_RESEARCH.md) — consolidated renderer ownership, geometry, hook sites, validated transforms, and rejected approaches.
+- [`HUD_RESEARCH.md`](HUD_RESEARCH.md) — consolidated renderer ownership, geometry, hook sites, validated transforms, and rejected approaches through the earlier battle-HUD work.
 - [`WINNER_ORB.md`](WINNER_ORB.md) — focused record of the round-win orb/glow investigation and final fix.
+- [`CENTER_TIMER.md`](CENTER_TIMER.md) — timer ownership, wrapper ABI requirement, final center correction, and device validation.
+- [`SIDE_LABELS.md`](SIDE_LABELS.md) — current research target for character-name and battle-mode text anchoring.
 - [`TOOLS.md`](TOOLS.md) — retained analysis/capture utilities and their intended use.
 - [`v1.1.0-auto-aspect-abi.md`](v1.1.0-auto-aspect-abi.md) — earlier automatic-aspect ABI investigation retained from v1.1.0 development.
 
