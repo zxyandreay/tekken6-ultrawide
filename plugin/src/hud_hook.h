@@ -16,6 +16,8 @@ void tekken6_hud_gauge_draw_hook(void);
 
 void tekken6_hud_side_strip_hook(void);
 
+void tekken6_hud_timer_digit_wrapper(void);
+
 void tekken6_hud_winner_glow_hook(void);
 
 int tekken6_hud_supported_aspect(float aspect);
