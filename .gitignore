@@ -12,3 +12,11 @@ UMD_DATA.BIN
 .DS_Store
 Thumbs.db
 *.log
+
+# Local reverse-engineering/debugger artifacts.
+# These may contain device endpoints, raw memory snapshots, frame dumps, or local paths.
+.local-research/
+*.ppdmp
+.env
+.env.*
+!.env.example
