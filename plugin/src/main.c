@@ -67,6 +67,13 @@ static const HudHookSite kHudSideStripSites[] = {
     {0x0892D5B0u, 0x0E2097ABu, 1},
 };
 
+/* The large round countdown submits its tens/ones glyphs through two direct
+ * calls that bypass the slot-builder scope used by the surrounding center HUD. */
+static const HudHookSite kHudTimerDigitSites[] = {
+    {0x08929AF8u, 0x0E24B5CBu, 1},
+    {0x08929B44u, 0x0E24B5CBu, 1},
+};
+
 /* Case-4 0x80019E converter call. Device A/B testing proved the narrow
  * source-vertex predicate in tekken6_hud_winner_glow_hook owns the residual
  * winner-orb glow on both sides. */
@@ -91,13 +98,15 @@ static int jump_target_is_reachable(uint32_t site, uint32_t target) {
 }
 
 static int hud_hooks_are_safe(uint32_t slot_hook, uint32_t rect_hook, uint32_t gauge_hook,
-                              uint32_t side_strip_hook, uint32_t winner_glow_hook) {
+                              uint32_t side_strip_hook, uint32_t timer_hook,
+                              uint32_t winner_glow_hook) {
     unsigned int index;
 
     if (!jump_target_is_reachable(kHudSlotBuilderSites[0].address, slot_hook)
         || !jump_target_is_reachable(kHudRectBuilderSites[0].address, rect_hook)
         || !jump_target_is_reachable(kHudGaugeDrawSites[0].address, gauge_hook)
         || !jump_target_is_reachable(kHudSideStripSites[0].address, side_strip_hook)
+        || !jump_target_is_reachable(kHudTimerDigitSites[0].address, timer_hook)
         || !jump_target_is_reachable(kHudWinnerGlowSites[0].address, winner_glow_hook)) {
         return 0;
     }
@@ -134,6 +143,14 @@ static int hud_hooks_are_safe(uint32_t slot_hook, uint32_t rect_hook, uint32_t g
         }
     }
 
+    for (index = 0; index < sizeof(kHudTimerDigitSites) / sizeof(kHudTimerDigitSites[0]); ++index) {
+        uint32_t current = read32(kHudTimerDigitSites[index].address);
+        uint32_t replacement = make_jump_word(timer_hook, kHudTimerDigitSites[index].link);
+        if (current != kHudTimerDigitSites[index].original && current != replacement) {
+            return 0;
+        }
+    }
+
     for (index = 0; index < sizeof(kHudWinnerGlowSites) / sizeof(kHudWinnerGlowSites[0]); ++index) {
         uint32_t current = read32(kHudWinnerGlowSites[index].address);
         uint32_t replacement = make_jump_word(winner_glow_hook, kHudWinnerGlowSites[index].link);
@@ -151,6 +168,7 @@ static void apply_hud_hooks(void) {
     uint32_t rect_hook = (uint32_t)(uintptr_t)&tekken6_hud_rect_hook;
     uint32_t gauge_hook = (uint32_t)(uintptr_t)&tekken6_hud_gauge_draw_hook;
     uint32_t side_strip_hook = (uint32_t)(uintptr_t)&tekken6_hud_side_strip_hook;
+    uint32_t timer_hook = (uint32_t)(uintptr_t)&tekken6_hud_timer_digit_wrapper;
     uint32_t winner_glow_hook = (uint32_t)(uintptr_t)&tekken6_hud_winner_glow_hook;
 
     for (index = 0; index < sizeof(kHudSlotBuilderSites) / sizeof(kHudSlotBuilderSites[0]); ++index) {
@@ -169,6 +187,10 @@ static void apply_hud_hooks(void) {
         write32(kHudSideStripSites[index].address,
                 make_jump_word(side_strip_hook, kHudSideStripSites[index].link));
     }
+    for (index = 0; index < sizeof(kHudTimerDigitSites) / sizeof(kHudTimerDigitSites[0]); ++index) {
+        write32(kHudTimerDigitSites[index].address,
+                make_jump_word(timer_hook, kHudTimerDigitSites[index].link));
+    }
     for (index = 0; index < sizeof(kHudWinnerGlowSites) / sizeof(kHudWinnerGlowSites[0]); ++index) {
         write32(kHudWinnerGlowSites[index].address,
                 make_jump_word(winner_glow_hook, kHudWinnerGlowSites[index].link));
@@ -186,6 +208,9 @@ static void apply_hud_hooks(void) {
     }
     for (index = 0; index < sizeof(kHudSideStripSites) / sizeof(kHudSideStripSites[0]); ++index) {
         sceKernelIcacheInvalidateRange((const void *)(uintptr_t)kHudSideStripSites[index].address, 4u);
+    }
+    for (index = 0; index < sizeof(kHudTimerDigitSites) / sizeof(kHudTimerDigitSites[0]); ++index) {
+        sceKernelIcacheInvalidateRange((const void *)(uintptr_t)kHudTimerDigitSites[index].address, 4u);
     }
     for (index = 0; index < sizeof(kHudWinnerGlowSites) / sizeof(kHudWinnerGlowSites[0]); ++index) {
         sceKernelIcacheInvalidateRange((const void *)(uintptr_t)kHudWinnerGlowSites[index].address, 4u);
@@ -313,9 +338,10 @@ int module_start(SceSize args, void *argp) {
         uint32_t rect_hook = (uint32_t)(uintptr_t)&tekken6_hud_rect_hook;
         uint32_t gauge_hook = (uint32_t)(uintptr_t)&tekken6_hud_gauge_draw_hook;
         uint32_t side_strip_hook = (uint32_t)(uintptr_t)&tekken6_hud_side_strip_hook;
+        uint32_t timer_hook = (uint32_t)(uintptr_t)&tekken6_hud_timer_digit_wrapper;
         uint32_t winner_glow_hook = (uint32_t)(uintptr_t)&tekken6_hud_winner_glow_hook;
         if (hud_hooks_are_safe(slot_hook, rect_hook, gauge_hook, side_strip_hook,
-                               winner_glow_hook)) {
+                               timer_hook, winner_glow_hook)) {
             apply_hud_hooks();
         }
     }
