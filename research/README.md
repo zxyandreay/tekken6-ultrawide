@@ -13,18 +13,19 @@ The following behavior has been validated on-device:
 - persistent round markers and newly earned round orbs use the center transform;
 - the transient winner-orb glow is corrected independently of the ordinary orb rectangle;
 - P1 and P2 first-win orb placement and winner glow are both correct in the integrated plugin;
-- the large center round countdown is horizontally de-stretched and centered through a timer-specific scope around its two digit submissions.
+- the large center round countdown is horizontally de-stretched and centered through a timer-specific scope around its two digit submissions;
+- y=28 character-name rectangles are de-stretched and semantically anchored LEFT/RIGHT for P1/P2.
 
-The winner-orb and center-round-timer subsystems are considered solved and should remain frozen unless a regression is demonstrated.
+The winner-orb, center-round-timer, and character-name rectangle subsystems are considered solved and should remain frozen unless a regression is demonstrated.
 
-The next active fight-HUD target is side-owned battle text: character names and battle-mode labels such as `ARCADE BATTLE`, `STORY BATTLE`, and `GHOST BATTLE`. These are separate from the already-corrected rank/strip/panel geometry.
+The next active fight-HUD target is the shared top-row font batch containing the left `STAGE/BATTLE + elapsed time` text and the right `ARCADE BATTLE`, `STORY BATTLE`, or `GHOST BATTLE` mode label. The whole batch cannot be moved as one unit; its glyphs must be classified by side.
 
 ## Documentation
 
-- [`HUD_RESEARCH.md`](HUD_RESEARCH.md) — consolidated renderer ownership, geometry, hook sites, validated transforms, and rejected approaches through the earlier battle-HUD work.
+- [`HUD_RESEARCH.md`](HUD_RESEARCH.md) — consolidated renderer ownership, geometry, hook sites, validated transforms, and rejected approaches.
 - [`WINNER_ORB.md`](WINNER_ORB.md) — focused record of the round-win orb/glow investigation and final fix.
 - [`CENTER_TIMER.md`](CENTER_TIMER.md) — timer ownership, wrapper ABI requirement, final center correction, and device validation.
-- [`SIDE_LABELS.md`](SIDE_LABELS.md) — current research target for character-name and battle-mode text anchoring.
+- [`SIDE_LABELS.md`](SIDE_LABELS.md) — character-name capture/fix, test-artifact cleanup, and the remaining top-row battle-label work.
 - [`TOOLS.md`](TOOLS.md) — retained analysis/capture utilities and their intended use.
 - [`v1.1.0-auto-aspect-abi.md`](v1.1.0-auto-aspect-abi.md) — earlier automatic-aspect ABI investigation retained from v1.1.0 development.
 
@@ -36,6 +37,7 @@ The next active fight-HUD target is side-owned battle text: character names and 
 - Do not hard-code session-local heap, vertex-buffer, GE-list, debugger, or network addresses.
 - Keep EBOOTs, frame dumps, memory snapshots, logs, test PRXs, debugger endpoints, and other local material under `.local-research/`; that directory is intentionally ignored.
 - Preserve Y coordinates, UVs, colors, alpha, animation lifetime, and rotation unless a specific finding proves they require correction.
+- Preserve the known-good PRX/ELF module layout during binary diagnostics unless a module-layout change is itself the subject of the experiment.
 
 ## Build and static verification
 
