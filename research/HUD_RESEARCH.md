@@ -119,6 +119,17 @@ original target: 0x08AE94A4
 
 This site is handled separately from the ordinary rectangle path because the winner glow is a rotated THROUGH quad.
 
+### Center-timer digit submissions
+
+The large round countdown has two dedicated calls to the original timer renderer `0x0892D72C`:
+
+```text
+0x08929AF8
+0x08929B44
+```
+
+The timer-specific wrapper temporarily enters the existing centered rectangle scope while each digit is submitted. The original renderer consumes a fifth stack argument; the wrapper must forward it before making the call. See [`CENTER_TIMER.md`](CENTER_TIMER.md).
+
 ## HP shell geometry
 
 A PPSSPP frame-dump differential isolated seven health-bar compositor draws: three shell/trough rectangles and four fill layers.
@@ -143,10 +154,10 @@ A clean slot-`0xEF` rectangle census produced:
 #2 a2=82,  a3=27, t0=128, t1=16, t2=128, t3=16
 #3 a2=397, a3=27, t0=128, t1=16, t2=128, t3=16
 #4 a2=-21, a3=5,  t0=256, t1=32, t2=256, t3=32
-#5 a2=501, a3=5,   t0=256, t1=32, t2=256, t3=32
+#5 a2=501, a3=5,  t0=256, t1=32, t2=256, t3=32
 ```
 
-Only the last two are the long side shells. The stable long-shell predicate is therefore:
+Only the last two are the long side shells. The stable long-shell predicate is:
 
 ```text
 a3=5
@@ -246,11 +257,68 @@ The P2 lower bound is `273`; a previous `274` lower bound skipped the first P2 l
 
 The transient winner glow is not an axis-aligned rectangle and is handled by a separate converter hook. See [`WINNER_ORB.md`](WINNER_ORB.md).
 
-## Center shell and timer
+## Center round timer
 
-The frame dump conclusively identifies the 64x32 center shell at `208..272`, but the six-hit slot census did not identify a unique live builder tuple for that center cap. Do not apply asymmetric side-span logic to it without re-establishing ownership.
+The timer is a separate family from the surrounding round rails/orbs. Its two digits are submitted at authored positions around:
 
-Timer and center text should remain proportion-correct and centered rather than horizontally stretched. Their final composition is still separate future work; the solved round-marker result does not imply the whole timer/front-end HUD is complete.
+```text
+digit 1: x=211, y=7
+digit 2: x=236, y=7
+```
+
+The timer wrapper scopes only those two submissions so the existing rectangle compositor applies the CENTER transform:
+
+```text
+x' = 0.8*x + 48
+width' = 0.8*width
+```
+
+An early integrated wrapper failed to forward the timer renderer's fifth stack argument and caused the countdown to disappear. The corrected ABI-preserving wrapper was validated on-device in multiple battle modes. The timer is solved and frozen. See [`CENTER_TIMER.md`](CENTER_TIMER.md).
+
+## Character-name rectangles
+
+Stable Arcade/Story/Ghost captures showed that character names already pass through the slot-`0xEF` rectangle compositor. Before the final fix, they were correctly de-stretched but incorrectly CENTER-anchored.
+
+Observed pre-fix post-hook geometry included:
+
+```text
+Story P1 KAZUYA: x=57..108,  y=28..44, 51x16
+Story P2 LARS:   x=381..432, y=28..44, 51x16
+Arcade P2 ASUKA: x=343..445, y=28..44, 102x16
+```
+
+The recovered authored family is:
+
+```text
+y=28
+height=16
+width=64 or 128
+```
+
+The permanent classifier retains the common 0.8 horizontal scale and selects anchor from authored X:
+
+```text
+X < 240 -> LEFT
+X > 240 -> RIGHT
+```
+
+On-device validation confirmed correct outward anchoring for P1/P2 character names without regressing the timer, HP, ranks, side effects, round markers, winner orb, winner glow, PPSSPP replacement textures, or fast-forward input.
+
+Two intermediate binary artifacts (`v9` / `v9.1`) carried an unintended enlarged PRX LOAD segment from a temporary trampoline experiment and produced unrelated emulator-side regressions. A clean v9.2 rebuilt from the known-good v8.1 module layout retained the name fix while restoring those behaviors. This is recorded in detail in [`SIDE_LABELS.md`](SIDE_LABELS.md).
+
+The character-name rectangle family is solved and frozen.
+
+## Shared top-row battle text
+
+The remaining persistent battle-label target is a stable `0x80011E` glyph batch at y≈1..14. Arcade, Story, and Ghost captures show nearly full-width batches:
+
+```text
+Arcade: x=12..467, count=52
+Story:  x=12..467, count=50
+Ghost:  x=11..467, count=52
+```
+
+The batch appears to contain both the left `STAGE/BATTLE + elapsed time` text and the right `ARCADE/STORY/GHOST BATTLE` label. It cannot be moved as one unit. The next research task is to identify its builder/vertex layout and apply LEFT/RIGHT transforms to the appropriate glyphs while leaving unrelated font/menu batches untouched.
 
 ## Rejected or misleading approaches
 
@@ -265,19 +333,22 @@ The following paths produced collateral, stale correlations, or insufficient own
 - treating packet `+0x20` as pixel width: observed values behave as scale coefficients;
 - deriving P1/P2 solely from packet-local X on mirrored/world-matrix paths;
 - hard-coding heap, vertex-buffer, texture-wrapper, or cached GE-list addresses: all were session dependent;
-- CPU read watchpoints on cached GE data: PPSSPP CPU watchpoints do not observe GE DMA consumption.
+- CPU read watchpoints on cached GE data: PPSSPP CPU watchpoints do not observe GE DMA consumption;
+- extending the PRX LOAD segment for an otherwise local binary diagnostic: produced unrelated PPSSPP regressions and is not acceptable for routine HUD tests.
 
-The stable strategy is to identify an owner or exact geometry/resource family, patch one narrow path, and verify the resulting GPU geometry and device presentation.
+The stable strategy is to identify an owner or exact geometry/resource family, patch one narrow path, preserve the known-good module layout, and verify both GPU geometry and device presentation.
 
 ## Current status
 
-Device-validated:
+Device-validated and frozen unless a regression is demonstrated:
 
 - 3D automatic ultrawide projection;
 - long HP shell span;
 - both HP fill layers at full/partial health;
 - rank badges and side strips/lightning;
 - persistent and immediate winner-orb placement;
-- P1/P2 winner-orb glow.
+- P1/P2 winner-orb glow;
+- center round countdown timer;
+- P1/P2 character-name rectangle anchoring.
 
-The winner-orb subsystem is frozen unless a regression is demonstrated. Remaining work should move to other battle-HUD families such as timer/labels before considering front-end screens.
+The next active fight-HUD target is the shared top-row `STAGE/BATTLE + elapsed time` / battle-mode glyph batch before moving on to center announcements and post-fight safe-area UI.
