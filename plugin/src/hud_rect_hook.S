@@ -95,9 +95,9 @@ tekken6_hud_rect_hook:
     nop
 
     /* The newly earned round orb sprite is submitted again after the
-     * slot-0xEF scope closes.  Match only the 16x16 y=27 orb slots on either
+     * slot-0xEF scope closes. Match only the 16x16 y=27 orb slots on either
      * side so it follows the same CENTER transform as the rail and persistent
-     * lit orbs.  The separate rotated winner-orb glow is not handled here. */
+     * lit orbs. The separate rotated winner-orb glow is not handled here. */
     li      $t4, 27
     bne     $a3, $t4, 1f
     nop
@@ -127,10 +127,9 @@ tekken6_hud_rect_hook:
     nop
 
 8:
-
-    /* Preserve authored side ownership for the y=10 player/rank panels.
-     * Round markers at y=27 remain tied to the protected center/HP endpoints. */
-
+    /* The scoped rectangle family contains both center-owned and side-owned
+     * HUD. Preserve the authored X before scaling so side ownership can be
+     * selected after the common 0.8 horizontal scale. */
     move    $t5, $a2
     li      $t4, 4
     mult    $a2, $t4
@@ -139,9 +138,31 @@ tekken6_hud_rect_hook:
     div     $a2, $t4
     mflo    $a2
 
+    /* y=10 player panels are side-owned. */
     li      $t4, 10
     beq     $a3, $t4, 6f
     nop
+
+    /* Device-validated character-name family. Stable captures recover the
+     * authored rectangles as y=28, height=16, width=64 or 128. They were
+     * already de-stretched by this hook but previously fell through to the
+     * CENTER anchor. Route only this shape to LEFT/RIGHT by authored X. */
+    li      $t4, 28
+    bne     $a3, $t4, 9f
+    nop
+    li      $t4, 16
+    bne     $t1, $t4, 9f
+    nop
+    bne     $t3, $t4, 9f
+    nop
+    li      $t4, 64
+    beq     $t0, $t4, 6f
+    nop
+    li      $t4, 128
+    beq     $t0, $t4, 6f
+    nop
+
+9:
     /* +49 balances the integer-truncated center family around x=240. */
     addiu   $a2, $a2, 49
     b       7f
@@ -154,7 +175,6 @@ tekken6_hud_rect_hook:
     addiu   $a2, $a2, 96
 
 7:
-
     li      $t4, 4
     mult    $t0, $t4
     mflo    $t0
@@ -264,8 +284,8 @@ tekken6_hud_side_strip_hook:
     nop
 
     /* Rank badges use the same positive sprite orientation on both sides,
-     * so the flip sign cannot identify P2.  Their authored X remains the
-     * semantic side discriminator (P1 is < 240, P2 is > 240).  Encode the
+     * so the flip sign cannot identify P2. Their authored X remains the
+     * semantic side discriminator (P1 is < 240, P2 is > 240). Encode the
      * result as the same sign convention consumed below. */
 6:
     lw      $t4, 0x00($a0)
