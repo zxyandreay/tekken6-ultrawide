@@ -2,28 +2,35 @@
 
 ## Status
 
-Open mode-specific HUD research target after the persistent normal battle HUD, center timer, and character-name anchoring were validated.
+Mode-specific HUD research after the persistent normal battle HUD, center timer, and character-name anchoring were validated.
 
-The normal Arcade/Story/Ghost battle-HUD fixes should remain frozen unless a regression is demonstrated. Practice and Gold Rush introduce additional HUD families that require separate ownership/geometry work.
+The normal Arcade/Story/Ghost battle-HUD fixes remain frozen unless a regression is demonstrated.
 
-## Practice observations
+Current status:
 
-Device screenshots with the current integrated HUD build show two distinct issues.
+```text
+Practice infinity indicator        SOLVED / DEVICE VALIDATED
+Practice damage/combo readout      SOLVED / DEVICE VALIDATED
+Gold Rush static labels            CORRECTION PATH VALIDATED
+Gold Rush money strings            OPEN / COMPOSITION RULE UNDER TEST
+```
+
+## Practice
 
 ### Infinite-time indicator
 
-The Practice infinite-time (`∞`) indicator is no longer centered after the normal round-timer correction. It is displaced left into/behind the P1 health-bar region.
+The Practice infinite-time (`∞`) indicator was displaced left into/behind the P1 health-bar area after the ordinary countdown work.
 
-The normal round countdown is rendered through two dedicated calls at:
+The ordinary decimal countdown is still owned by the two validated timer submissions:
 
 ```text
 0x08929AF8
 0x08929B44
 ```
 
-The plugin currently wraps both calls unconditionally and temporarily enables the centered rectangle scope. Normal two-digit timers are device-validated with that rule, but Practice demonstrates that an alternate timer/status presentation shares part of this path and cannot be assumed to have identical geometry semantics.
+A direct A/B against those two calls did not restore the Practice indicator, proving that the visible `∞` is not owned by the normal tens/ones timer submissions.
 
-A stable Practice capture isolates one mode-only `0x80011A` rectangle at:
+The stable Practice capture isolated one mode-only `0x80011A` rectangle:
 
 ```text
 post-hook bbox: x=166..217, y=6..38
@@ -31,78 +38,153 @@ post-hook size: 51x32
 texture: 0f87368a50b3...
 ```
 
-Its 51-pixel width is exactly the fixed-20:9 0.8 scaling of an authored 64-pixel rectangle. Inverting the current CENTER mapping recovers authored X around `147`. Applying the RIGHT-style horizontal offset to that authored geometry would yield approximately `214..265`, centering the 51-pixel result around x=240. This is a strong candidate for the Practice infinite-time correction, but it should remain a test hypothesis until the surrounding mode-specific glyph geometry is expanded and checked.
+An exact-shape rectangle diagnostic moved only this already-transformed `51x32` rectangle from x=166 to x=214. Device testing confirmed that this restores the Practice `∞` to the visual center while leaving the normal decimal countdown unchanged.
 
-Do not remove or weaken the validated normal timer correction globally. The final fix should recognize the Practice-only geometry narrowly.
+This family is therefore considered solved. The permanent implementation should preserve the narrow exact-shape / Practice-only ownership gate rather than weakening the normal timer correction.
 
 ### Practice statistics panel
 
-The left-side Practice HITS / DAMAGE / combo/readout family appears to have correct LEFT ownership/placement but remains horizontally stretched.
+The left Practice DAMAGE / HIT COMBO / DAMAGE readout is rendered inside a batched `0x80011E` font submission using texture `8b127e798779...`.
 
-Desired behavior:
-
-```text
-anchor: LEFT
-horizontal scale: 0.8 at fixed 20:9
-vertical placement/scale: preserve
-```
-
-The first-stage capture identifies a stable `0x80011E` batched font draw using texture `8b127e798779...`:
+Second-stage glyph analysis separates the Practice battle HUD cleanly:
 
 ```text
-Practice idle: count=38, bbox x=3..463, y=2..116
-Practice hit:  count=78, bbox x=3..463, y=2..139
+mode header:  y=2..14, far right
+stats rows:   y=104..116
+              y=116..128
+              y=127..139
 ```
 
-The hit state adds 40 vertices, i.e. 20 rectangle-glyph pairs, strongly indicating that the dynamic HITS / DAMAGE / combo text is appended into the same batched font submission as other Practice HUD text. The parent draw cannot be transformed as a whole because it spans both sides of the HUD. The per-glyph rectangles must be expanded and classified by authored side/region.
+The idle batch contains 38 vertices; the hit state grows to 78 vertices, adding 20 rectangle/glyph pairs for the dynamic Practice readout.
 
-Static string resources in ULUS10466 include Practice formatting/text near the 0x08B9B2xx/0x08B9B3xx range, including `DAMAGE` and `HIT COMBO` format strings. String identity alone is not sufficient to patch the renderer; stable draw ownership must be established first.
-
-## Gold Rush observations
-
-The Gold Rush right-side score/gold HUD appears correctly RIGHT-owned but horizontally stretched.
-
-Desired behavior:
+A battle-HUD-gated converter diagnostic applied only:
 
 ```text
-anchor: RIGHT
-horizontal scale: 0.8 at fixed 20:9
-vertical placement/scale: preserve
+x < 200
+y = 104..139
+LEFT transform: x' = trunc(4*x/5)
 ```
 
-The first-stage capture shows several Gold-Rush-only THROUGH submissions. Two full-screen multi-rectangle parents (`0x80011A` and `0x80011C`, each with count 16 and 512x272 aggregate bounds) are especially important because their aggregate bounding boxes hide disconnected child rectangles. These are strong candidates for the right-side REWARD / gold / attack-variation family and require per-rectangle expansion before a safe predicate can be written.
+Device testing confirmed that the Practice damage/combo readout becomes proportion-correct and remains correctly left-owned.
 
-The ordinary right HP shell and known character/rank rectangles are also present and should remain frozen; they are not the Gold Rush target.
+An earlier diagnostic matched only by X/Y bands and also affected Practice menus that reused the same global font converter. The corrected diagnostic additionally requires the far-right Practice/Gold-Rush mode header in the same converter batch before any glyph transformation. Permanent code must retain an owner/batch gate; a global font-row transform is not acceptable.
 
-Do not apply a global right-side text transform because ordinary battle labels and menu/result screens have separate composition rules.
+Practice battle HUD is considered solved at the research level.
 
-## Capture results and second-stage analysis
+## Gold Rush
 
-Initial read-only capture completed successfully for:
+Gold Rush uses the same `0x80011E` batched font family, but its composition contains several independent strings in the same converter submission. The visible right-side labels and money values must not be treated as one undifferentiated screen-right block.
+
+The captured Gold Rush font batch contains 96 vertices / 48 glyph rectangles. Per-glyph analysis recovers these stable groups:
+
+### Mode header
 
 ```text
-practice-idle
-practice-hit
-goldrush
+y=2..14
+x≈377..466
 ```
 
-Use the second-stage analyzer on the existing captures; no recapture is required:
+`GOLD RUSH` is already acceptable and should remain untouched.
+
+### Top reward row
+
+The y=16 row contains two separate strings:
 
 ```text
-python research/tools/ppdmp_mode_hud_glyphs.py .local-research/mode-hud
+REWARD:       x≈276..349   7 glyphs
+reward value  x≈409..465   5 glyphs in the captured sample
 ```
 
-It expands multi-rectangle THROUGH draws into individual rectangle/glyph pairs and writes:
+The last reward-value glyph uses the distinct gold/currency color but remains part of the same `0x80011E` batch.
+
+### Attack-variation row
 
 ```text
-.local-research/mode-hud/glyph-analysis.json
+ATTACK VARIATION  x≈317..466, y=64..76
 ```
 
-This is required before patching the Practice stats or Gold Rush score family because their parent draw bounds combine multiple unrelated screen regions.
+One low-alpha glyph/rectangle also appears around x≈477..490 in the captured batch and should not be used as the alignment anchor for the visible label.
+
+### Gold-gain rows
+
+Two dynamic six-glyph money rows were captured:
+
+```text
+y=136..148, x≈399..465
+y=148..160, x≈399..465
+```
+
+Each contains a leading plus/value sequence and a differently colored final currency glyph.
+
+## Device result from first Gold Rush correction
+
+The first safe battle-batch-gated diagnostic applied the generic RIGHT rule:
+
+```text
+x' = trunc(4*x/5) + 96
+```
+
+to the Gold Rush y=16, y=64, y=136, and y=148 regions.
+
+Device testing showed:
+
+- `REWARD:` and `ATTACK VARIATION` visibly improved;
+- the money/value strings became inconsistent in perceived scale/spacing;
+- Practice remained corrected;
+- the remaining Gold Rush problem is therefore specifically the money/string composition rule, not basic font ownership.
+
+The generic screen-right origin is too coarse for a batch that contains both left-aligned and right-aligned strings.
+
+## Current Gold Rush A/B
+
+Two narrower composition models should be compared before permanent integration.
+
+### Variant A — labels only
+
+Keep the validated Practice correction. In Gold Rush:
+
+```text
+correct REWARD:
+correct ATTACK VARIATION
+leave top reward amount stock
+leave +gold rows stock
+```
+
+This tests whether the money strings were already acceptable and were over-corrected by the first generic RIGHT transform.
+
+### Variant B — local string anchors
+
+De-stretch each Gold Rush string around its own composition anchor rather than framebuffer x=480:
+
+```text
+REWARD:            keep left edge around x=276
+reward amount:     keep right edge around x=465
+ATTACK VARIATION:  keep right edge around x=466
++gold rows:        keep right edge around x=465
+```
+
+The intended scale remains 0.8 horizontally; Y, vertical scale, UVs, color, and animation remain unchanged.
+
+The device comparison between Variant A and Variant B will determine the permanent Gold Rush rule.
+
+## Converter path
+
+The relevant `0x80011E` dispatcher path reaches the converter through:
+
+```text
+0x08AC9CC4 -> 0x08AE9C14
+```
+
+The converter emits 16-byte THROUGH vertices. The diagnostic post-processes only X after Tekken's own conversion and only after the whole-batch ownership predicate passes.
+
+This is intentionally separate from the slot-`0xEF` rectangle hook; Practice/Gold Rush font glyphs do not belong to the axis-aligned rectangle family used by the HP shell, round markers, timer digits, or character-name plates.
 
 ## Safety rules
 
-- Do not reopen the validated normal countdown geometry to solve Practice.
-- Do not globally transform font/sprite renderers.
-- Prefer a mode/owner/shape predicate that affects only the target family.
-- Preserve PPSSPP texture replacement behavior and emulator controls; test PRXs must retain the clean validated module layout.
+- Keep the validated normal Arcade/Story/Ghost HUD frozen.
+- Keep the ordinary decimal timer correction frozen.
+- Practice `∞` must use a narrow exact-shape/mode rule.
+- Never globally transform the `0x80011E` font converter by screen row alone.
+- Require battle-HUD batch ownership before Practice/Gold Rush text correction.
+- Preserve PPSSPP texture replacement behavior and emulator controls.
+- Test PRXs must retain the clean validated module layout; do not repeat the malformed v9/v9.1 load-segment experiment.
