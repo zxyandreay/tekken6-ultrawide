@@ -1,0 +1,106 @@
+name: Publish v1.2.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'release/v1.2.0/.publish'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v1.2.0
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: v1.2.0
+      ASSET: Tekken6-Ultrawide-v1.2.0.zip
+      ZIP_SHA256: 1e36e0abdaf77ae4dec7657b5542ca3d8e8b754fc4b5873bcf978b3f2e7d6c44
+      PRX_SHA256: 311720e8aa115865343df4fcd13fa5e9f8f074ff1e05348ab165e9c6ef81ee75
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Restore and verify exact validated release archive
+        run: |
+          base64 --decode release/v1.2.0/Tekken6-Ultrawide-v1.2.0.zip.b64 > "$ASSET"
+          echo "$ZIP_SHA256  $ASSET" | sha256sum --check --strict
+
+          ACTUAL_PRX_SHA256="$(unzip -p "$ASSET" PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx | sha256sum | awk '{print $1}')"
+          test "$ACTUAL_PRX_SHA256" = "$PRX_SHA256"
+
+          cat > /tmp/expected-files.txt <<'EOF'
+          PSP/Cheats/ULUS10466.ini
+          PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx
+          PSP/PLUGINS/Tekken6Ultrawide/plugin.ini
+          README-PLUGIN.md
+          EOF
+
+          unzip -Z1 "$ASSET" | sort > /tmp/actual-files.txt
+          sort /tmp/expected-files.txt -o /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+
+          if unzip -Z1 "$ASSET" | grep -Eiq '(EXP[0-9]+|DynamicHP|research/)'; then
+            echo "Experimental/research filename found in public archive."
+            exit 1
+          fi
+
+          sha256sum "$ASSET" > "$ASSET.sha256"
+          unzip -l "$ASSET"
+
+      - name: Write release notes
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          # Tekken 6 Ultrawide v1.2.0
+
+          v1.2.0 adds **AutoHUD** correction to the automatic PPSSPP aspect-ratio plugin for **Tekken 6 USA (`ULUS10466`)**.
+
+          ## Highlights
+
+          - Keeps the automatic 3D aspect-ratio correction introduced in v1.1.0.
+          - Adds dynamic correction for the persistent fight HUD using PPSSPP's reported landscape aspect.
+          - Preserves both HP fills, side HUD, timer, round indicators, winner effects, character labels, Practice HUD text, and Gold Rush battle labels.
+          - Validated across Arcade, Story, Ghost Battle, Practice, and Gold Rush on the release test device.
+          - Preserves custom replacement-texture/font behavior from the validated compact build.
+          - Keeps the optional `Original`, `Slightly Wider`, `Wider`, and `Widest` camera presets.
+          - Ships the plugin under the production filename `Tekken6Ultrawide.prx`; no experimental build names are included.
+
+          ## Installation
+
+          Extract **`Tekken6-Ultrawide-v1.2.0.zip`** into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder. Keep **Stretch** enabled under PPSSPP's display layout settings.
+
+          If you already maintain custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up first and merge the included camera entries manually.
+
+          Do not enable legacy v1.0.0 manual aspect-ratio CWCheats together with the plugin.
+
+          ## Compatibility
+
+          This release targets **Tekken 6 USA (`ULUS10466`)** on PPSSPP with PRX plugin support in landscape orientation. Other regional versions are not supported.
+
+          ## Validation note
+
+          The HUD correction is derived from PPSSPP's runtime-reported aspect rather than a fixed aspect-ratio list. The v1.2.0 release was extensively validated on the target device at an approximately 20:9 presentation; other display ratios were not independently device-tested during this release cycle.
+
+          ## Scope
+
+          v1.2.0 focuses on the persistent fight HUD. Some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.
+          EOF
+
+      - name: Publish GitHub release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+            gh release edit "$TAG"               --title "Tekken 6 Ultrawide v1.2.0"               --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG"               "$ASSET"               "$ASSET.sha256"               --target main               --title "Tekken 6 Ultrawide v1.2.0"               --notes-file /tmp/release-notes.md
+          fi

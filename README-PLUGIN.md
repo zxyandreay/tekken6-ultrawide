@@ -1,13 +1,15 @@
-# Tekken 6 Ultrawide v1.1.0
+# Tekken 6 Ultrawide v1.2.0
 
-This release replaces the old manual aspect-ratio CWCheats with an automatic PPSSPP PRX plugin for **Tekken 6 USA (`ULUS10466`)**.
+v1.2.0 adds automatic battle-HUD correction on top of the automatic 3D aspect-ratio correction introduced in v1.1.0 for **Tekken 6 USA (`ULUS10466`)** on PPSSPP.
 
-## What v1.1.0 does
+## What v1.2.0 does
 
 - Automatically reads PPSSPP's current landscape display aspect ratio.
-- Corrects Tekken 6's 3D projection without requiring a matching aspect-ratio cheat.
-- Keeps camera preference separate as normal CWCheat presets.
-- Requires no plugin configuration file editing.
+- Corrects Tekken 6's 3D projection without requiring a manual aspect-ratio cheat.
+- Dynamically corrects the persistent fight HUD so it keeps its intended proportions and anchoring on widescreen displays.
+- Preserves both HP fills, player-side HUD, timer, round indicators, winner effects, character labels, Practice HUD text, and Gold Rush battle labels.
+- Keeps optional camera framing as normal CWCheat presets in PPSSPP's Cheats menu.
+- Requires no plugin configuration editing.
 
 The package intentionally contains **no manual aspect-ratio CWCheats**, avoiding conflicts with the automatic plugin.
 
@@ -30,20 +32,19 @@ README-PLUGIN.md
 2. Extract the package into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder.
 3. Enable **Tekken 6 Ultrawide** in PPSSPP's plugin manager if it is not enabled automatically.
 4. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch**.
-5. Cold-boot Tekken 6 USA (`ULUS10466`). Do not enable any legacy v1.0.0 aspect-ratio CWCheats.
-
-The 3D scene should now use PPSSPP's current landscape display aspect automatically.
+5. Cold-boot Tekken 6 USA (`ULUS10466`).
+6. Do not enable legacy v1.0.0 manual aspect-ratio CWCheats at the same time as this plugin.
 
 ## Camera presets
 
-Camera settings remain optional and are selected from PPSSPP's normal Cheat menu. Enable at most one:
+The included `PSP/Cheats/ULUS10466.ini` contains optional camera presets. Enable at most one:
 
 - `Camera - Original (Default)`
 - `Camera - Slightly Wider`
 - `Camera - Wider`
 - `Camera - Widest`
 
-No plugin INI editing is required for camera selection.
+The automatic aspect/HUD plugin works independently of the camera preset.
 
 ## Compatibility
 
@@ -54,10 +55,8 @@ No plugin INI editing is required for camera selection.
 
 Other regional releases are not currently supported.
 
-## Known limitation
+## Validation and limitations
 
-v1.1.0 corrects the **3D projection**. Tekken 6's original 2D HUD and menu layout is still rendered for the stock presentation and is not independently repositioned in this release.
+The v1.2.0 PRX was validated on-device across Arcade, Story, Ghost Battle, Practice, and Gold Rush, including HP fill, mode-specific battle text, and replacement-texture/font behavior. The HUD coefficients are derived from PPSSPP's reported aspect at runtime rather than selected from a fixed list. The validated target device used an approximately 20:9 presentation; other aspect ratios were not independently device-tested during this release cycle.
 
-## Development note
-
-The automatic-aspect path was validated on-device after isolating a temporary non-PSPDEV test-build ABI issue around six-argument `sceIoDevctl` calls. The investigation is preserved in `research/v1.1.0-auto-aspect-abi.md`.
+v1.2.0 focuses on the persistent fight HUD. Some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.

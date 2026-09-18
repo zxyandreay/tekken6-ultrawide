@@ -1,28 +1,48 @@
 # Tekken 6 PPSSPP Ultrawide
 
-Automatic 3D aspect-ratio correction for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP**, with optional gameplay camera presets available from PPSSPP's normal Cheat menu.
+Automatic **3D + gameplay HUD aspect-ratio correction** for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP**, with optional gameplay camera presets in PPSSPP's normal Cheat menu.
 
 ![Tekken 6 PPSSPP ultrawide 20:9 aspect ratio with Widest camera preview](assets/tekken6-aspect-camera-preview.png)
 
 > **Screenshot settings:** 20:9 display + `Camera - Widest`
 
-## v1.1.0
+## v1.2.0
 
-v1.1.0 replaces the old manual aspect-ratio CWCheats with a PRX plugin that reads PPSSPP's current landscape display aspect automatically.
+v1.2.0 extends the automatic 3D correction introduced in v1.1.0 with **AutoHUD** correction for the persistent fight interface.
 
-You no longer need to choose a 21:9, 20:9, 19.5:9, 16:10, or other matching aspect entry yourself. Keep PPSSPP on **Stretch**, enable the plugin, and the 3D projection is corrected for the display aspect PPSSPP reports.
+The plugin reads PPSSPP's current landscape display aspect at runtime. The 3D projection and the corrected battle-HUD paths derive their horizontal scaling/anchoring from that runtime aspect instead of requiring a manually selected aspect-ratio cheat.
 
-Camera selection remains separate as lightweight CWCheats, so users can change camera framing directly from the Cheat menu without editing a plugin configuration file.
+### AutoHUD coverage
+
+The validated v1.2.0 build preserves and corrects:
+
+- HP shells and both colored HP fill layers
+- player-side strips and rank badges
+- character-name anchoring
+- round timer
+- round markers and winner effects
+- Practice infinite timer and combo/damage text
+- Gold Rush `REWARD` and `ATTACK VARIATION` labels
+- mode-specific fight HUD used by Arcade, Story, Ghost Battle, Practice, and Gold Rush
+- custom replacement-texture/font behavior validated during development
+
+Camera framing remains optional and separate through CWCheat presets.
 
 ## Installation
 
-1. Open the [latest release](https://github.com/zxyandreay/tekken6-ultrawide/releases/latest) and download the v1.1.0 ZIP.
-2. If you already have `PSP/Cheats/ULUS10466.ini` with unrelated custom cheats, back it up first.
-3. Extract the ZIP into your PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder.
+1. Open the [latest release](https://github.com/zxyandreay/tekken6-ultrawide/releases/latest) and download **`Tekken6-Ultrawide-v1.2.0.zip`**.
+2. Back up `PSP/Cheats/ULUS10466.ini` first if it contains unrelated custom cheats you want to keep.
+3. Extract the ZIP into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder.
 4. Enable **Tekken 6 Ultrawide** in PPSSPP's plugin manager if it is not enabled automatically.
 5. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch**.
 6. Cold-boot **Tekken 6 USA (`ULUS10466`)**.
-7. Do not enable the legacy v1.0.0 manual aspect-ratio CWCheats at the same time as the plugin.
+7. Do not enable legacy v1.0.0 manual aspect-ratio CWCheats at the same time as the plugin.
+
+The release archive contains the production plugin filename:
+
+```text
+PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx
+```
 
 ## Camera options
 
@@ -35,13 +55,27 @@ The included `PSP/Cheats/ULUS10466.ini` contains camera presets only. Enable at 
 | `Camera - Wider` | Wider gameplay framing |
 | `Camera - Widest` | Maximum included camera preset |
 
-Camera cheats are optional. The automatic aspect plugin works independently of them.
+Camera cheats are optional. Automatic aspect/HUD correction works independently of them.
 
-## How automatic aspect correction works
+## How automatic correction works
 
-Tekken 6 constructs its stock `16:9` projection constant in four validated code paths. The plugin asks PPSSPP for the current landscape display aspect, converts that float into the same MIPS `lui` / `ori` constant pair used by the game, patches those four projection paths, and invalidates the relevant instruction-cache ranges.
+Tekken 6's stock presentation is based on a 16:9 logical frame. The plugin asks PPSSPP for the current landscape display aspect and derives the correction at runtime rather than selecting from a fixed list of phone or monitor ratios.
 
-The plugin accepts landscape aspect values from `1.0` through `4.0`, so it is not limited to a hardcoded list of phone or monitor ratios.
+The 3D projection is patched to PPSSPP's reported display aspect. For HUD paths that need correction, the validated AutoHUD implementation applies aspect-derived horizontal scale and left/center/right anchoring while preserving vertical geometry and mode-specific behavior.
+
+## Validation
+
+The exact v1.2.0 PRX was validated on-device across:
+
+- Arcade
+- Story
+- Ghost Battle
+- Practice
+- Gold Rush
+
+Validation included HP fill, Practice combo/hit text, Gold Rush battle labels, main-menu text stability, and custom replacement-texture/font behavior, with no observed regression in that test sweep.
+
+The implementation is aspect-derived rather than fixed to 20:9. The release target device used an approximately 20:9 presentation; other display ratios were not independently device-tested during this release cycle.
 
 ## Compatibility
 
@@ -54,14 +88,15 @@ Other regional versions are not currently supported.
 
 ## Limitations
 
-- v1.1.0 corrects the game's **3D projection**.
-- Tekken 6's original 2D HUD and menu layout is not independently repositioned or corrected yet.
-- The package's `ULUS10466.ini` contains camera presets only; if you maintain other custom cheats for the game, merge them manually after backing up your file.
+- v1.2.0 focuses on the persistent fight HUD. Some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.
+- The package's `ULUS10466.ini` contains camera presets only. Merge it manually if you maintain other custom cheats.
+- Cross-aspect visual validation beyond the release test device remains welcome.
 
-## Previous release
+## Previous releases
 
-v1.0.0 used manual CWCheat aspect-ratio presets plus camera presets. That release remains available in GitHub Releases for users who prefer the original cheat-only approach.
+- **v1.1.0:** automatic 3D aspect correction; original 2D HUD remained uncorrected.
+- **v1.0.0:** manual aspect-ratio CWCheats plus camera presets.
 
 ## Development
 
-The source for the PRX plugin lives under `plugin/`. Automatic aspect math has a small host-side test in `tools/test_aspect_math.c`. The device-side ABI investigation that led to the working automatic build is preserved in `research/v1.1.0-auto-aspect-abi.md`.
+The exact device-validated v1.2.0 PRX is the authoritative release artifact. The sanitized AutoHUD investigation and release provenance are documented in [`research/v1.2.0-autohud.md`](research/v1.2.0-autohud.md).
