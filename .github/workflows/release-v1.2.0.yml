@@ -1,11 +1,6 @@
 name: Publish v1.2.0
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'release/v1.2.0/.publish'
   workflow_dispatch:
 
 permissions:
