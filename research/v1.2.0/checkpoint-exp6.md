@@ -63,7 +63,7 @@ Practice infinity placement              correct
 Practice DAMAGE / HIT COMBO text         visibly de-stretched
 Gold Rush intended labels                visibly de-stretched
 Gold Rush label placement                correct
-normal battle HUD corrections            retained
+normal battle HUD corrections            unchanged
 ```
 
 This resolves the final known visual tradeoff between EXP3 and EXP4.
@@ -85,7 +85,7 @@ Practice infinity        wrong
 
 ### EXP3
 
-EXP3 retained the early scale behavior and corrected the Practice infinity placement.
+EXP3 kept the early scale behavior and corrected the Practice infinity placement.
 
 It therefore gave the strongest evidence that applying the 80% horizontal scale early was required for a true visible glyph de-stretch.
 
@@ -118,7 +118,7 @@ visible de-stretch       incomplete / absent
 
 ### EXP5
 
-EXP5 deliberately removed mode-font correction and retained only the Practice infinity fix.
+EXP5 deliberately removed mode-font correction and kept only the Practice infinity fix.
 
 It remains an important simplified fallback because it proved a stable minimal mode-specific configuration within the `0x0EB0` footprint.
 
@@ -281,7 +281,7 @@ At least one non-default camera preset should remain enabled during future check
 
 `CHECKPOINT_INFINITY_ONLY.md` remains useful as the last simplified fallback checkpoint.
 
-If later mode-font work regresses stability, layout, custom textures, or camera compatibility, EXP5 provides a known minimal recovery target:
+If later mode-font work regresses stability, layout, custom textures, or camera compatibility, EXP5 provides a known minimal fallback target:
 
 ```text
 EXP5 PRX SHA-256:
