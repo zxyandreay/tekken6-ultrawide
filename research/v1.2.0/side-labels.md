@@ -1,5 +1,3 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # Side-owned battle text labels
 
 ## Status
@@ -84,7 +82,7 @@ X < 240 -> LEFT
 X > 240 -> RIGHT
 ```
 
-Expected fixed-20:9 positions from the recovered authored geometry are approximately:
+Expected fixed-20:9 positions from the authored geometry are approximately:
 
 ```text
 KAZUYA -> 8..59
@@ -107,7 +105,7 @@ v8.1: 0x0EB0
 v9.1: 0x1054
 ```
 
-That extra `0x1A4` mapped bytes were residue from a temporary installer/trampoline experiment, not part of the name-anchor logic. The malformed artifact produced unrelated regressions, including PPSSPP replacement textures no longer being selected for some top-HUD assets and the user's fast-forward input no longer working normally.
+That extra `0x1A4` mapped bytes were residue from a temporary installer/trampoline experiment, not part of the name-anchor logic. The malformed artifact produced unrelated regressions, including PPSSPP replacement textures no longer being selected for some top-HUD assets and fast-forward input no longer working normally.
 
 A clean `v9.2` test was rebuilt directly from the known-good v8.1 PRX with identical ELF headers, LOAD segment size, section layout, module footprint, timer code, and all other hooks. Only two existing classifier instructions were changed in place. With that clean binary:
 
