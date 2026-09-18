@@ -2,13 +2,7 @@
 
 This directory preserves the detailed reverse-engineering record behind Tekken 6 Ultrawide v1.2.0.
 
-The archive was reconstructed after the temporary research branches were deleted. Recovery used:
-
-- old commits that remained addressable by SHA;
-- the final pre-release research snapshot;
-- operator-retained test ZIPs and their embedded test notes;
-- exact PRX/ZIP hashes;
-- recovered subsystem documentation.
+The archive combines recovered subsystem notes, retained test-build evidence, exact artifact hashes, and the final validated implementation record.
 
 The intent is to preserve **how the implementation was discovered**, including failed experiments and intermediate hypotheses, rather than documenting only the final AutoHUD equations.
 
@@ -46,8 +40,6 @@ No local network addresses, debugger endpoints, device identifiers, or workstati
 10. [`tools-and-probes.md`](tools-and-probes.md)  
     Frame-dump, glyph, timer, side-label, HP-path, downstream renderer, hook verification, and candidate-generator methodology.
 
-11. [`../v1.2.0-autohud-timeline.md`](../v1.2.0-autohud-timeline.md)  
-    Chronological commit milestones and recovered SHAs.
 
 ## Major phases
 
@@ -121,8 +113,6 @@ p_filesz = 0x0EB0
 p_memsz  = 0x0EB0
 ```
 
-## Historical limitation
+## Archive boundary
 
-Some raw local debugger captures were never committed and therefore cannot be reconstructed from Git alone.
-
-However, the important measurements, addresses, control-flow findings, experiment purposes, PRX hashes, device outcomes, and architectural conclusions are preserved in this archive.
+Some raw local debugger captures were never committed and are not preserved here. The measurements, addresses, control-flow findings, experiment purposes, artifact hashes, device outcomes, and architectural conclusions needed to understand the implementation are preserved.
