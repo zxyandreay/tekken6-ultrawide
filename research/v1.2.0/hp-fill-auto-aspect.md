@@ -593,7 +593,7 @@ The important methodological lessons are broader than the one bug.
 
 ## 16.1 A restored local hook can still fail downstream
 
-EXP14 proved that copying a working hook byte-for-byte does not prove the draw will survive later shared code.
+EXP14 proved that copying a working hook byte-for-byte does not guarantee that the draw will still reach the correct downstream submission path.
 
 ## 16.2 Compare at the same stage
 
