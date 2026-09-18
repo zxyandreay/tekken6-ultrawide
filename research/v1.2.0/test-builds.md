@@ -13,6 +13,62 @@ No local network addresses, debugger endpoints, device identifiers, or workstati
 
 ---
 
+## Research origin and pre-composition diagnostics
+
+The repository did not begin from a completed HUD-correction build. The earliest preserved state was a known-good 3D-only CWCheat with stretched HUD/UI and no identified HUD transform.
+
+The following retained diagnostic packages belong to the transition from broad 2D hypotheses into direct battle-HUD ownership mapping.
+
+### Tekken6-HUD-PathMap-v1
+
+ZIP SHA-256: cd3757849e98307d588f81257f7ec315c9a67679efc97fc8e8ef4a404df35853
+
+Purpose: redirect selected battle-HUD draw calls through a +32 PSP-pixel X-shift wrapper so ownership could be identified visually without yet applying safe-area scaling.
+
+The package explicitly used one known HP-fill path as MAP 0 control and tested other direct sprite candidates separately.
+
+A later retained CMain diagnostic records the result that 0x0892D56C / 0x0892D5B0 is the visible HP-fill renderer and that the older MAP 1-5 candidates did not affect the visible fight HUD.
+
+### Tekken6-HUD-Ortho-GroupMap-v3
+
+ZIP SHA-256: bf7365194d861460eacacd98f9e0dc7b637286014b0da10479b59ccb28bb14a7
+
+Purpose: suppress orthographic UI compositor groups 9, 10, 12, 13, 14, 15, 16 and 17 independently to identify ownership of the static HP frame/shell and related battle UI.
+
+A later retained Group 10 note records that MAP 2 / Group 10 hides the health bars.
+
+### Tekken6-HUD-Group10-SafeArea-v4
+
+ZIP SHA-256: 894718248677aa9775dec9470349bf7166e6390c59e746203e4b08bc4a8f4599
+
+Purpose: first retained HP safe-area candidate after Group 10 ownership was identified.
+
+The test installed a centered 16:9 orthographic projection only for Group 10 on a 20:9 output, using bounds -60..540.
+
+The artifact proves the intended experiment. The exact device-visible result is not preserved strongly enough in the recovered evidence to state a conclusion.
+
+### Tekken6-HUD-Group10-SafeArea-v5
+
+ZIP SHA-256: 437909de210d3e5478218012ffc37569d9082ea8f9045ca42d4cc27dfe65a727
+
+Purpose: move the Group 10 safe-area projection later, to the draw-list submission itself, and add an exaggerated 50%-width diagnostic if the normal safe-area transform was visually ambiguous.
+
+Again, the retained artifact proves the hypothesis and test design; the precise device result is not claimed without stronger surviving evidence.
+
+### Tekken6-HUD-CMain-PathMap-v2
+
+ZIP SHA-256: aafc75856a22a1dcf219517512dce5ab920b89714e0623599f6d6eac7d912039
+
+Purpose: identify which CMainTcb_t::Draw sub-renderer owns the static HP frame/background around the already-confirmed CGauge fill.
+
+The retained note records these static ownership findings:
+
+- tk::sprite::battle::CGaugeTcb_t::Draw = 0x0892C124
+- tk::sprite::battle::CMainTcb_t::Draw = 0x0892BDAC
+
+This diagnostic marks the transition from broad compositor-group tests to battle-object-specific ownership mapping.
+
+---
 ## 1. Early frame-dump diagnostic set
 
 ### `Tekken6-HUD-FrameDump-Test-Cheats`
@@ -300,7 +356,7 @@ y=28  -> SIDE character names
 
 The actual temporary implementation used even/odd row parity only as a minimal validation patch; the permanent semantic design remained explicit predicates.
 
-This build became the compact stable baseline for later Practice/Gold research.
+This build became the compact rollback point used for later Practice/Gold research.
 
 ## Stable rollback
 
@@ -651,7 +707,7 @@ No second cached-factor multiplication was applied at the late stage because the
 
 This produced the accepted fixed-20:9 mode-HUD behavior.
 
-EXP6 became the visual reference for AutoHUD.
+This later fixed-ratio build became a known-good comparison artifact during AutoHUD debugging; it was not the starting baseline of the research.
 
 ---
 
@@ -665,7 +721,7 @@ The exact binaries/test notes for every one of these early AutoHUD experiments w
 
 Later binary comparison established that EXP8 kept the HP-fill hot hook in the same effective EXP6 instruction/register shape and changed the coefficients by startup self-patching.
 
-It was therefore an important architectural reference even though the broader AutoHUD line still had unrelated mode/font issues.
+It was therefore a useful later comparison point even though the broader AutoHUD line still had unrelated mode/font issues.
 
 ## EXP9–EXP10
 
