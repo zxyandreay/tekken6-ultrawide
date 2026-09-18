@@ -1,5 +1,3 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # Practice and Gold Rush HUD
 
 ## Current checkpoint status
@@ -70,7 +68,7 @@ stats rows:   y=104..116
               y=127..139
 ```
 
-The historical semantic correction is:
+The correction is:
 
 ```text
 x < 200
@@ -115,7 +113,7 @@ floating +gold rows:
   stock / no transform
 ```
 
-The historical semantic RIGHT transform is:
+The RIGHT transform is:
 
 ```text
 x' = trunc(4*x/5) + 96
@@ -182,7 +180,7 @@ Therefore EXP4 solved placement/state consistency but not the complete visible d
 
 EXP5 removed the mode-font correction and retained only the Practice infinity correction.
 
-It proved the minimal stable fallback and remains useful as a recovery baseline.
+It provided a minimal stable fallback for further font experiments.
 
 ### EXP6 — accepted solution
 
@@ -261,7 +259,7 @@ No second 0.8 cached-factor multiplication is applied at the late stage. The ear
 
 EXP6 was validated on the official PPSSPP release.
 
-User result:
+Test result:
 
 ```text
 EXP6 worked.
