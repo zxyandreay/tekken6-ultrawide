@@ -1,6 +1,11 @@
 name: Publish v1.2.0
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-v1.2.0.yml'
   workflow_dispatch:
 
 permissions:
@@ -63,18 +68,18 @@ jobs:
           ## Highlights
 
           - Keeps the automatic 3D aspect-ratio correction introduced in v1.1.0.
-          - Adds dynamic correction for the persistent fight HUD using PPSSPP's reported landscape aspect.
-          - Preserves both HP fills, side HUD, timer, round indicators, winner effects, character labels, Practice HUD text, and Gold Rush battle labels.
-          - Validated across Arcade, Story, Ghost Battle, Practice, and Gold Rush on the release test device.
-          - Preserves custom replacement-texture/font behavior from the validated compact build.
-          - Keeps the optional `Original`, `Slightly Wider`, `Wider`, and `Widest` camera presets.
-          - Ships the plugin under the production filename `Tekken6Ultrawide.prx`; no experimental build names are included.
+          - Adds automatic correction for the persistent fight HUD based on PPSSPP's current landscape aspect ratio.
+          - Keeps HP bars, player-side HUD, timer, round indicators, winner effects, and character labels properly positioned and proportioned.
+          - Preserves Practice mode HUD text, including combo/hit information.
+          - Preserves Gold Rush battle labels such as `REWARD` and `ATTACK VARIATION`.
+          - Works with the custom replacement textures/fonts tested during development.
+          - Includes the optional `Original`, `Slightly Wider`, `Wider`, and `Widest` camera presets.
 
           ## Installation
 
           Extract **`Tekken6-Ultrawide-v1.2.0.zip`** into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder. Keep **Stretch** enabled under PPSSPP's display layout settings.
 
-          If you already maintain custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up first and merge the included camera entries manually.
+          If you already have custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up first and merge the included camera entries manually.
 
           Do not enable legacy v1.0.0 manual aspect-ratio CWCheats together with the plugin.
 
@@ -82,9 +87,11 @@ jobs:
 
           This release targets **Tekken 6 USA (`ULUS10466`)** on PPSSPP with PRX plugin support in landscape orientation. Other regional versions are not supported.
 
-          ## Validation note
+          ## Tested modes
 
-          The HUD correction is derived from PPSSPP's runtime-reported aspect rather than a fixed aspect-ratio list. The v1.2.0 release was extensively validated on the target device at an approximately 20:9 presentation; other display ratios were not independently device-tested during this release cycle.
+          v1.2.0 was tested in **Arcade, Story, Ghost Battle, Practice, and Gold Rush** with no observed HUD regressions in that test sweep.
+
+          AutoHUD derives its correction from PPSSPP's reported aspect ratio at runtime rather than requiring a manually selected aspect-ratio preset. The release was tested on an approximately 20:9 display; other display ratios were not independently tested for this release.
 
           ## Scope
 
