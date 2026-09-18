@@ -56,7 +56,7 @@ The hook copied source XY into module scratch, changed the scratch X, redirected
 
 The first automatic-aspect builds introduced several unrelated regressions.
 
-By EXP11, most font/mode behavior had been recovered, but HP fill remained absent.
+By EXP11, most font/mode behavior was working again, but HP fill remained absent.
 
 ## EXP11
 
@@ -466,7 +466,7 @@ This closed the missing-fill regression.
 
 # 12. EXP15 was not yet true dynamic HP
 
-EXP15 repaired control flow but intentionally retained the EXP6 fixed 20:9 HP hook.
+EXP15 repaired control flow but intentionally kept the fixed 20:9 HP hook.
 
 Its embedded constants were:
 
