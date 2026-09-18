@@ -1,10 +1,6 @@
 # v1.2.0 research tools and probe methodology
 
-This document records the analysis/probe workflow used during the HUD reverse engineering that led to v1.2.0.
-
-Environment-specific debugger addresses, local relay details, device identifiers, and workstation paths are intentionally omitted.
-
-The original scripts were research tools, not release dependencies.
+These tools were used to answer narrow ownership, geometry, ABI, and control-flow questions during HUD reverse engineering.
 
 ---
 
@@ -21,7 +17,7 @@ Purpose:
 Important A/B states:
 
 ```text
-A baseline
+A control
 B hide health-bar group
 C shift HP fill only
 ```
@@ -47,7 +43,7 @@ Used for:
 
 Method:
 
-1. capture a stock/baseline frame;
+1. capture a stock/control frame;
 2. change one diagnostic patch;
 3. capture again;
 4. diff draw calls rather than visually guessing;
@@ -200,8 +196,6 @@ Research rule:
 
 > never interpret a probe timeout as a game/rendering finding until basic debugger transport and game identity are independently verified.
 
-All environment-specific endpoints have been removed from the preserved documentation.
-
 ---
 
 ## 9. HP fill path probe
@@ -210,7 +204,7 @@ All environment-specific endpoints have been removed from the preserved document
 
 Purpose:
 
-- compare working EXP6 with broken AutoHUD builds at the exact gauge owner/renderer boundary.
+- compare a known-good fixed-ratio build with a broken AutoHUD build at the exact gauge owner/renderer boundary.
 
 Captured:
 
@@ -269,7 +263,7 @@ stock submission
 renderer return
 ```
 
-This probe established the working EXP6 baseline packet and found that EXP14 never reached stock submission.
+This probe established the known-good HP packet path and found that the broken AutoHUD candidate never reached stock submission.
 
 It then showed that HP packets were taking a stale side-hook rejection branch into the wrong fall-through region.
 
@@ -370,8 +364,8 @@ Several practical rules emerged during remote-debugger research:
 
 - use execution breakpoints only where necessary;
 - remove breakpoints on success, failure, timeout, and cancellation;
-- resume the CPU after a stopped probe unless the operator explicitly wants it paused;
-- record raw output locally before asking for the next operator action;
+- resume the CPU after a stopped probe unless the test requires a paused state;
+- record raw output before the next test action;
 - avoid broad conditions in hot render loops;
 - pair caller/renderer state using RA/SP/thread context;
 - do not trust stale pre-delay-slot registers;
@@ -392,7 +386,7 @@ Does the immediate first P2 orb use x=273?
 Does the timer wrapper preserve every ABI argument?
 Is this name rectangle LEFT or RIGHT owned?
 Does early scale change glyph width before geometry is derived?
-Does broken EXP14 reach the same HP renderer state as EXP6?
+Does the broken AutoHUD candidate reach the same HP renderer state as the known-good fixed-ratio build?
 Does the packet reach stock submission?
 ```
 
