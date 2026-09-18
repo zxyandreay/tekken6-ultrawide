@@ -1,5 +1,3 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # Winner-orb and round-win glow investigation
 
 ## Final status
