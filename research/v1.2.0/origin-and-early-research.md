@@ -1,150 +1,225 @@
 # Origin and early HUD-correction research
 
-This document preserves the earliest recoverable HUD-correction research from the original repository history.
+## Initial state
 
-It is based on the old commits themselves and retained diagnostic packages. Where a result is not recoverable, the text says so rather than inferring an outcome.
+HUD research began from a known-good 20:9 3D CWCheat for Tekken 6 USA (ULUS10466).
 
-## Earliest preserved baseline
+At this point:
 
-The first research commit, f720d0157face81618f9b818e3d763977e55a6ae, records the actual starting point.
+- 3D rendered correctly at 20:9;
+- HUD/UI remained stretched under PPSSPP Stretch;
+- no plugin existed;
+- no HUD transform or HUD-scale path had been identified.
 
-At that point:
+Earlier sprite-level experiments had already produced pause-overlay problems, incorrect or empty health fills, blocky corruption, and inconsistent UI behavior.
 
-- Tekken 6 USA (ULUS10466) had a known-good 20:9 3D CWCheat;
-- PPSSPP was used with Stretch layout;
-- the 3D scene could be widened correctly;
-- HUD/UI remained stretched;
-- no plugin source existed yet;
-- no HUD transform had been identified.
+The first objective was therefore to find the highest practical level where Tekken converts logical HUD/UI coordinates into output coordinates, rather than patching individual sprites blindly.
 
-The original HUD research goal was to find the highest practical level where Tekken 6 converts logical HUD, UI, or screen-space coordinates into output coordinates, so HUD/UI proportions could be preserved independently from 20:9 3D rendering.
+## Map the working 3D path first
 
-The same baseline records an important historical negative result supplied before the repository work began: earlier individual-sprite/2D manipulation had caused pause-overlay problems, empty or incorrect health fills, blocky corruption, and inconsistent UI behavior.
+The four known CWCheat aspect writes were mapped into the decrypted MIPS EBOOT.
 
-That is why the research initially preferred a higher-level screen-space or projection solution over per-element patching.
+The original aspect constant is:
 
-## Mapping the known 3D patch first
+```text
+0x3FE38E39 ~= 1.7777778 = 16:9
+```
 
-The next work mapped the known CWCheat writes into the decrypted MIPS EBOOT and established the four 3D aspect sites.
+The working 20:9 value is:
 
-The original 16:9 constant is approximately 0x3FE38E39 = 1.7777778. The known 20:9 cheat constant is approximately 0x400E38E4 = 2.2222223.
+```text
+0x400E38E4 ~= 2.2222223 = 20:9
+```
 
-The four sites were then traced into perspective/projection code so the already-working 3D behavior could be understood before HUD work changed anything else.
+Tracing these sites established the known perspective/projection path before any HUD changes were attempted.
 
-## First HUD hypothesis: orthographic projection
+## Hypothesis 1 — orthographic safe-area projection
 
-The early branch identified a generic orthographic projection builder at 0x08ACA990 and three direct 480x272 setup paths.
+A generic orthographic projection builder was identified at:
 
-For 20:9, the centered-safe-area hypothesis used a 600-unit virtual width with bounds -60..540. This was mathematically consistent with mapping the original 0..480 HUD into a centered 16:9 region after PPSSPP Stretch.
+```text
+0x08ACA990
+```
 
-The branch deliberately tested the three orthographic paths independently.
+Three direct 480x272 setup paths were found.
 
-Recovered result from the old research commits: all three isolated orthographic-path tests produced no visible change in HUD/UI/menus.
+For a centered 16:9 HUD inside a 20:9 stretched output, the proposed logical width was:
 
-That rejected the first high-level hypothesis and the research explicitly pivoted from generic orthographic projection to the live screen-space/sprite coordinate path.
+```text
+480 * (20/16) = 600
+```
 
-## Separate 3D and HUD correction architecture
+with horizontal bounds:
 
-The branch then studied The Warriors PPSSPP widescreen fix as an architectural reference.
+```text
+-60 .. 540
+```
 
-The useful lesson was architectural rather than address-specific: a working widescreen implementation can use one game path for 3D projection and a separate HUD-specific scale path.
+### Test
 
-This motivated a search for Tekken-specific HUD scale, descriptor, and setter paths instead of assuming one global framebuffer or orthographic transform.
+Patch each direct orthographic path independently and compare HUD, menus, and overlays.
 
-## Warriors-style HUD candidate ranking
+### Observation
 
-Static analysis ranked functions that combined PSP-like 480/272 constants, floating-point setup, descriptor/state writes, and renderer/helper calls.
+All three isolated paths produced no visible HUD/UI/menu change.
 
-The highest-ranked candidates were traced more deeply. Candidate ranking was explicitly treated as evidence for where to probe, not proof of HUD ownership.
+### Conclusion
 
-## First PRX/plugin experiments
+The visible HUD was not controlled by these three direct orthographic setup paths.
 
-An experimental PRX was added so the known 3D writes and HUD hypotheses could be tested at runtime.
+### Next step
 
-The first plugin did not reproduce the already-known CWCheat behavior reliably. The branch therefore stopped HUD testing and diagnosed plugin execution first.
+Trace live screen-space and sprite-coordinate paths instead of continuing global orthographic experiments.
 
-Recovered commits show a sequence of runtime verification, PPSSPP JIT/cache-order investigation, and a CWCheat-order diagnostic.
+## Hypothesis 2 — separate HUD scale path
 
-This established a critical rule: the runtime patch mechanism itself had to be proven before a negative HUD result could mean anything.
+The Warriors PPSSPP widescreen fix was studied as an architectural comparison because it separates:
+
+```text
+display aspect
+  -> 3D projection path
+  -> HUD-specific scale path
+```
+
+The useful idea was to search for a Tekken-specific HUD scale or descriptor path independent of the known 3D projection sites.
+
+Static analysis ranked functions that combined:
+
+- 480/272-style screen constants;
+- floating-point operations;
+- descriptor/state writes;
+- renderer/helper calls.
+
+The rankings were used only to choose probe targets; they were not treated as ownership proof.
+
+## First PRX runtime tests
+
+An experimental PRX was introduced to reproduce the known 3D patch and test HUD candidates at runtime.
+
+The first plugin did not reliably reproduce the already-working CWCheat result.
+
+HUD testing was paused until the runtime patch path itself was understood.
+
+The next tests focused on:
+
+- locating the live Tekken code region;
+- verifying writes and readback;
+- PPSSPP JIT/cache behavior;
+- matching the invalidation/order behavior of the working CWCheat path.
+
+### Conclusion
+
+A negative HUD result is meaningful only after the runtime patch mechanism is independently verified.
 
 ## Descriptor and property-setter tracing
 
-After the runtime path was better understood, the branch returned to HUD ownership.
+With the runtime patch path under control, analysis returned to candidate 2D ownership.
 
-Static analysis traced candidate descriptor fields, X/Y or scale-like fields, property setters, and helper functions that construct or submit 2D state.
+The next static probes traced:
 
-A focused v0.5 trace followed candidate HUD scale setters and 2D property helpers.
+- descriptor fields;
+- X/Y or scale-like members;
+- property setters;
+- helper functions that construct or submit 2D state.
 
-The exact device outcome for every intermediate candidate is not recoverable, so the current documentation does not promote any of them to validated HUD owners.
+A focused trace followed likely X/Y scale setters and related 2D property helpers.
 
-Their value was narrowing the search away from broad projection guesses and toward live 2D data flow.
+These tests narrowed the candidate space but did not establish one universal HUD-scale owner.
 
-## Native PSP 2D presentation path
+## Hypothesis 3 — native PSP 2D presentation path
 
-The next phase traced a native PSP 2D presentation/viewport path.
+A native PSP 2D presentation/viewport path was then traced through:
 
-Recovered commits show: trace native PSP 2D presentation path; run native 2D safe-area trace; follow native 2D transform trampoline; classify live flat viewport owner; add native PSP 2D safe area.
+- the presentation setup;
+- a transform trampoline;
+- the flat viewport owner;
+- a centered safe-area hook.
 
-This proves that another high-level safe-area candidate was implemented and investigated. The recovered evidence does not justify claiming that this alone solved the battle HUD.
+This provided another high-level place to test a 16:9 safe-area transform.
 
-The later work moved to much narrower battle-HUD ownership tests.
+It did not become the complete battle-HUD solution, so the research moved further down the rendering stack.
 
-## Transition to direct battle-HUD path mapping
+## Direct battle-HUD ownership mapping
 
-Once the automatic 3D plugin was established, the research began mapping the battle HUD with controlled draw-call diagnostics.
+The next phase stopped asking for one global HUD transform and instead identified the owners of visible battle elements.
 
 ### HUD Path Map
 
-The retained Tekken6-HUD-PathMap-v1 package redirected selected 2D draw calls through a +32 PSP-pixel X-shift wrapper.
+`Tekken6-HUD-PathMap-v1` redirected selected draw calls through an exaggerated +32 PSP-pixel X shift.
 
-It did not attempt final scaling. It asked only which visible HUD element was owned by each exact call.
+The purpose was ownership identification, not final scaling.
 
-The retained CMain follow-up records the key result:
+A known HP-fill path served as a control while other candidate calls were tested independently.
 
-0x0892D56C / 0x0892D5B0 = visible HP fill renderer
+### Result
 
-and records that the old MAP 1-5 candidates did not affect the visible fight HUD.
+The visible HP fill renderer was identified at:
 
-### Orthographic UI group mapping
+```text
+0x0892D56C
+0x0892D5B0
+```
 
-The retained Ortho-GroupMap-v3 package independently suppressed compositor groups 9, 10, 12, 13, 14, 15, 16 and 17.
+The other MAP 1–5 candidates did not move the visible fight HUD.
 
-A later retained test note records that Group 10 hides the health bars.
+This established that the colored HP fill had a narrow renderer path that could be studied separately.
 
-This linked a compositor group to health-bar presentation without assuming it owned every sub-element.
+## Orthographic compositor-group mapping
 
-### Group 10 safe-area candidates
+`Tekken6-HUD-Ortho-GroupMap-v3` independently suppressed compositor groups:
 
-Two retained tests then attempted a centered 16:9 projection specifically around Group 10.
+```text
+9, 10, 12, 13, 14, 15, 16, 17
+```
 
-One installed the safe-area projection before the Group 10 render block. A follow-up moved the change to the Group 10 draw-list call and also supplied an exaggerated 50%-width diagnostic.
+### Result
 
-These artifacts prove the hypothesis and test design. Their exact user-visible result is not preserved strongly enough in the recovered evidence to state a final conclusion here.
+Group 10 hid the health bars.
 
-### CMain path mapping
+This linked a compositor group to health-bar presentation, but did not yet identify the individual shell/fill owners inside that presentation.
 
-The retained CMain diagnostic records:
+## Group 10 safe-area tests
 
-- tk::sprite::battle::CGaugeTcb_t::Draw = 0x0892C124
-- tk::sprite::battle::CMainTcb_t::Draw = 0x0892BDAC
+Two tests applied a centered 16:9 projection specifically around Group 10.
 
-The experiment suppressed individual CMain sub-renderers to identify the shell/trough/frame around the already-confirmed CGauge fill.
+### First test
 
-This marks the transition from broad UI-group hypotheses to battle-object ownership.
+Install the safe-area projection before the Group 10 render block.
 
-## What changed after this point
+### Second test
 
-From this stage onward, the successful research strategy became increasingly local:
+Move the projection change to the Group 10 draw-list call and add an exaggerated 50%-width diagnostic.
 
-- identify the visual family;
-- prove its owner;
-- capture authored geometry;
-- determine LEFT/CENTER/RIGHT semantics;
-- patch only the narrow path that owns it;
-- regression-test unrelated HUD and overlays.
+### Result
 
-The later fight-HUD, timer, winner-glow, character-name, Practice/Gold, memory-footprint, and AutoHUD investigations are documented in the rest of the v1.2.0 archive.
+Not recorded in the experiment notes.
 
-The important historical point is that the project did not begin from a finished fixed-ratio HUD implementation.
+The research subsequently moved to battle-object ownership instead of continuing group-wide projection changes.
 
-It began from a known-good 3D-only patch with unknown HUD ownership, then moved through failed high-level projection hypotheses, screen-space/descriptor/native-2D tracing, direct battle-HUD ownership mapping, per-family correction, and only later automatic HUD generalization.
+## CMain / CGauge ownership
+
+The next diagnostic mapped battle objects directly.
+
+Static ownership:
+
+```text
+tk::sprite::battle::CGaugeTcb_t::Draw = 0x0892C124
+tk::sprite::battle::CMainTcb_t::Draw  = 0x0892BDAC
+```
+
+The test suppressed individual CMain sub-renderers to identify the static HP frame/trough around the already-confirmed CGauge fill.
+
+This was the point where the HUD model changed from “one 2D layer” to a set of independent render families with different owners.
+
+## Working method from this point
+
+The rest of the HUD correction followed the same pattern:
+
+1. identify one visible family;
+2. prove its owner;
+3. capture authored geometry;
+4. determine LEFT/CENTER/RIGHT semantics;
+5. patch only that owner/path;
+6. verify unrelated HUD and overlays remain unchanged.
+
+That method led to the later HP shell/fill, side strip/rank, round marker, winner glow, timer, character-name, Practice/Gold Rush, and AutoHUD work.
