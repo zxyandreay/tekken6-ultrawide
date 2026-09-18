@@ -12,6 +12,8 @@ Documents the PPSSPP automatic-aspect query work, including the six-argument `sc
 
 [`v1.2.0-autohud.md`](v1.2.0-autohud.md)
 
+**Detailed archive:** [`v1.2.0/README.md`](v1.2.0/README.md)
+
 The detailed reverse-engineering and implementation record for the v1.2.0 battle-HUD work. It covers:
 
 - semantic LEFT/CENTER/RIGHT HUD composition;
@@ -45,3 +47,8 @@ The current documentation intentionally omits local network addresses, debugger 
 The exact device-validated release PRXs are authoritative for the published versions. The readable source tree is not automatically assumed to be byte-identical to every compact hand-integrated research binary.
 
 For v1.2.0 specifically, a future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, `0x0EB0` resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and official-PPSSPP stability before being considered equivalent to the published artifact.
+
+
+### Recovered detailed v1.2.0 archive
+
+The first post-release summary was intentionally compact and did not preserve enough of the experiment-by-experiment process. The detailed archive under [`v1.2.0/`](v1.2.0/) restores the original subsystem notes plus retained test-build evidence, including the RoundWin, Timer, SideNames, ModeHUD, compact EXP1–EXP6, and AutoHUD EXP11–EXP17 progression.
