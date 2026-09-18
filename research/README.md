@@ -29,11 +29,11 @@ See `v1.2.0/README.md` for:
 - HP AutoHUD packet tracing;
 - probe methodology.
 
-## Documentation convention
+## Research method
 
-Each experiment records only what was established by static analysis, a controlled test, a runtime capture, or a validated build. If a test result was not recorded, it is marked as such rather than inferred.
+Record only what is established by static analysis, a controlled test, a runtime capture, or a validated build. Mark an unrecorded result as `Result: not recorded` rather than inferring it.
 
-## Source versus release binary
+## Implementation status
 
 The exact device-validated v1.2.0 PRX is authoritative for the release.
 
