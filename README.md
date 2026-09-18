@@ -2,7 +2,7 @@
 
 Automatic **3D + gameplay HUD aspect-ratio correction** for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP**, with optional gameplay camera presets in PPSSPP's normal Cheat menu.
 
-![Tekken 6 PPSSPP ultrawide 20:9 aspect ratio with Widest camera preview](assets/tekken6-aspect-camera-preview.png)
+![Tekken 6 PPSSPP ultrawide 20:9 aspect ratio with Widest camera preview](assets/tekken6-aspect-camera-preview.jpg)
 
 > **Screenshot settings:** 20:9 display + `Camera - Widest`
 
