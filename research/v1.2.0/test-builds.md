@@ -1,23 +1,18 @@
 # v1.2.0 HUD research test-build archive
 
-This file inventories the recovered test artifacts used during the HUD/AutoHUD research that led to v1.2.0.
+This file records the test builds used during HUD/AutoHUD research.
 
-The artifacts were reconstructed from two sources:
+Each entry includes the build purpose, checksum, relevant binary layout, and recorded test result. If an experiment note does not contain a result, the entry is marked `Result: not recorded`.
 
-1. the original deleted research history, which remained addressable by commit SHA; and
-2. the operator's retained ZIP test builds, whose PRX hashes and embedded test notes were re-inspected after branch cleanup.
-
-This archive records the experiment purpose and result/lesson. It does **not** store the binaries themselves in Git.
-
-No local network addresses, debugger endpoints, device identifiers, or workstation paths are retained.
+The binaries themselves are not stored in Git.
 
 ---
 
 ## Research origin and pre-composition diagnostics
 
-The repository did not begin from a completed HUD-correction build. The earliest preserved state was a known-good 3D-only CWCheat with stretched HUD/UI and no identified HUD transform.
+The initial working state was a known-good 3D-only CWCheat with stretched HUD/UI and no identified HUD transform.
 
-The following retained diagnostic packages belong to the transition from broad 2D hypotheses into direct battle-HUD ownership mapping.
+The following diagnostics mark the transition from broad 2D hypotheses into direct battle-HUD ownership mapping.
 
 ### Tekken6-HUD-PathMap-v1
 
@@ -27,7 +22,7 @@ Purpose: redirect selected battle-HUD draw calls through a +32 PSP-pixel X-shift
 
 The package explicitly used one known HP-fill path as MAP 0 control and tested other direct sprite candidates separately.
 
-A later retained CMain diagnostic records the result that 0x0892D56C / 0x0892D5B0 is the visible HP-fill renderer and that the older MAP 1-5 candidates did not affect the visible fight HUD.
+Result: 0x0892D56C / 0x0892D5B0 is the visible HP-fill renderer; MAP 1-5 did not affect the visible fight HUD.
 
 ### Tekken6-HUD-Ortho-GroupMap-v3
 
@@ -35,17 +30,17 @@ ZIP SHA-256: bf7365194d861460eacacd98f9e0dc7b637286014b0da10479b59ccb28bb14a7
 
 Purpose: suppress orthographic UI compositor groups 9, 10, 12, 13, 14, 15, 16 and 17 independently to identify ownership of the static HP frame/shell and related battle UI.
 
-A later retained Group 10 note records that MAP 2 / Group 10 hides the health bars.
+Result: MAP 2 / Group 10 hides the health bars.
 
 ### Tekken6-HUD-Group10-SafeArea-v4
 
 ZIP SHA-256: 894718248677aa9775dec9470349bf7166e6390c59e746203e4b08bc4a8f4599
 
-Purpose: first retained HP safe-area candidate after Group 10 ownership was identified.
+Purpose: first HP safe-area candidate after Group 10 ownership was identified.
 
 The test installed a centered 16:9 orthographic projection only for Group 10 on a 20:9 output, using bounds -60..540.
 
-The artifact proves the intended experiment. The exact device-visible result is not preserved strongly enough in the recovered evidence to state a conclusion.
+Result: not recorded.
 
 ### Tekken6-HUD-Group10-SafeArea-v5
 
@@ -53,7 +48,7 @@ ZIP SHA-256: 437909de210d3e5478218012ffc37569d9082ea8f9045ca42d4cc27dfe65a727
 
 Purpose: move the Group 10 safe-area projection later, to the draw-list submission itself, and add an exaggerated 50%-width diagnostic if the normal safe-area transform was visually ambiguous.
 
-Again, the retained artifact proves the hypothesis and test design; the precise device result is not claimed without stronger surviving evidence.
+Result: not recorded.
 
 ### Tekken6-HUD-CMain-PathMap-v2
 
@@ -61,7 +56,7 @@ ZIP SHA-256: aafc75856a22a1dcf219517512dce5ab920b89714e0623599f6d6eac7d912039
 
 Purpose: identify which CMainTcb_t::Draw sub-renderer owns the static HP frame/background around the already-confirmed CGauge fill.
 
-The retained note records these static ownership findings:
+Static ownership:
 
 - tk::sprite::battle::CGaugeTcb_t::Draw = 0x0892C124
 - tk::sprite::battle::CMainTcb_t::Draw = 0x0892BDAC
@@ -73,7 +68,7 @@ This diagnostic marks the transition from broad compositor-group tests to battle
 
 ### `Tekken6-HUD-FrameDump-Test-Cheats`
 
-Recovered ZIP SHA-256:
+ZIP SHA-256:
 
 ```text
 0bb70815097a1d65b534847c000dba9ec0cc4bce474aaebe8b052687b7a30ec2
@@ -118,11 +113,11 @@ p_filesz = 0x0BE4
 p_memsz  = 0x0BF8
 ```
 
-The retained ZIP does not contain a dedicated experiment note; its package README still describes the v1.1.0 automatic-3D baseline.
+The ZIP does not contain a dedicated experiment note; its package README describes the automatic-3D state.
 
-The corresponding recovered HUD notes place this build in the early battle-composition phase, before the later fixed `0x0EB0` compact checkpoint. The research at this stage was consolidating HP shell/fill, side strip/rank, and round-family corrections into one battle-HUD implementation.
+This build belongs to the early battle-composition phase, when HP shell/fill, side strip/rank, and round-family corrections were being consolidated.
 
-Because the ZIP itself does not preserve a specific pass/fail note, no stronger device result is inferred from the artifact alone.
+Result: not recorded.
 
 ---
 
@@ -147,7 +142,7 @@ PRX size:
 
 Purpose: fix only the first P2 earned-orb lower bound.
 
-The retained test note records an exact one-word patch:
+The test note records an exact one-word patch:
 
 ```text
 slti t4,a2,274
@@ -185,7 +180,7 @@ p_filesz = p_memsz = 0x0EB0
 
 v7 combined the validated first-orb correction with the separately researched winner-glow correction.
 
-Recovered implementation:
+Implementation:
 
 ```text
 callsite:   0x08AC9C38
@@ -370,7 +365,7 @@ PRX SHA-256:
 87af2db9b6211b5fda5f1d95847102dc99df69ddc662b9642f3091b0fd6adec7
 ```
 
-This is byte-identical to the v9.2 CLEAN PRX and was retained specifically as a recovery point before further Practice/mode-font work.
+This is byte-identical to the v9.2 CLEAN PRX and served as the rollback point before further Practice/mode-font work.
 
 ---
 
@@ -397,7 +392,7 @@ v10 integrated all then-known normal battle HUD corrections with Practice/Gold m
 
 To avoid enlarging the validated first LOAD, it added a second executable LOAD at module-relative vaddr `0x2000`.
 
-The retained test note explicitly asks for replacement-texture and fast-forward regression checks.
+The test note explicitly calls for replacement-texture and fast-forward regression checks.
 
 Observed research outcome: custom replacement textures regressed again.
 
@@ -538,7 +533,7 @@ y = 73
 
 Gold money/value strings were deliberately excluded.
 
-EXP2's retained note records that EXP1 proved the compact `0x0EB0` integration could preserve custom Tekken replacement textures.
+The EXP2 note records that EXP1 kept custom Tekken replacement textures working within the compact `0x0EB0` layout.
 
 ## ModeCompact EXP2
 
@@ -707,15 +702,15 @@ No second cached-factor multiplication was applied at the late stage because the
 
 This produced the accepted fixed-20:9 mode-HUD behavior.
 
-This later fixed-ratio build became a known-good comparison artifact during AutoHUD debugging; it was not the starting baseline of the research.
+This fixed-ratio build became a known-good comparison point during AutoHUD debugging.
 
 ---
 
 # 8. AutoHUD experiments: partial record before EXP11
 
-The retained artifact set begins at EXP11, but later research notes preserve several important facts about EXP7–EXP10.
+The build records are complete from EXP11 onward. Notes from later experiments also describe several EXP7–EXP10 behaviors.
 
-The exact binaries/test notes for every one of these early AutoHUD experiments were not recovered, so this section deliberately records only what later notes prove.
+For EXP7–EXP10, only behaviors explicitly described by later experiment notes are listed.
 
 ## EXP8
 
@@ -761,7 +756,7 @@ EXP11 fixed the Gold branch-entry problem by routing both target branches throug
 
 It also revised HP parameter transport to avoid the new relocation dependency introduced earlier.
 
-Device result preserved by EXP12 notes:
+Recorded device result:
 
 - Gold `REWARD` restored;
 - custom textures preserved;
@@ -936,9 +931,9 @@ This PRX became the v1.2.0 release artifact.
 
 ---
 
-# 12. Duplicate retained artifacts
+# 12. Duplicate archived artifacts
 
-Two copies of the same EXP6 ZIP were supplied during reconstruction:
+Two archived copies of the same EXP6 ZIP have identical hashes:
 
 ```text
 Tekken6-HUD-v9.3-ModeCompact-EXP6(5).zip
@@ -952,13 +947,13 @@ ZIP SHA-256:
 f2f0b3a75559adc9c68bb8a70dde6fa7891573145fd5d2b4a4ac40ab784b5efd
 ```
 
-This is useful provenance confirmation rather than two separate experiments.
+They are the same experiment, not separate builds.
 
 ---
 
 # 13. What the artifact sequence demonstrates
 
-The retained builds show a consistent research methodology:
+The test sequence follows a consistent research method:
 
 1. isolate one renderer/owner;
 2. build the smallest possible test;
