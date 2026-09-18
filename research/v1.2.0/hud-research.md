@@ -304,7 +304,7 @@ X > 240 -> RIGHT
 
 On-device validation confirmed correct outward anchoring for P1/P2 character names without regressing the timer, HP, ranks, side effects, round markers, winner orb, winner glow, PPSSPP replacement textures, or fast-forward input.
 
-Two intermediate binary artifacts (`v9` / `v9.1`) carried an unintended enlarged PRX LOAD segment from a temporary trampoline experiment and produced unrelated emulator-side regressions. A clean v9.2 rebuilt from the known-good v8.1 module layout retained the name fix while restoring those behaviors. This is recorded in detail in [`SIDE_LABELS.md`](SIDE_LABELS.md).
+Two intermediate binary artifacts (`v9` / `v9.1`) carried an unintended enlarged PRX LOAD segment from a temporary trampoline experiment and produced unrelated emulator-side regressions. A clean v9.2 rebuilt from the known-good v8.1 module layout kept the name fix while restoring those behaviors. This is recorded in detail in [`SIDE_LABELS.md`](SIDE_LABELS.md).
 
 The character-name rectangle family is solved and frozen.
 
