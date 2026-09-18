@@ -14,7 +14,7 @@ The plugin reads PPSSPP's current landscape display aspect at runtime. The 3D pr
 
 ### AutoHUD coverage
 
-The validated v1.2.0 build preserves and corrects:
+v1.2.0 corrects:
 
 - HP shells and both colored HP fill layers
 - player-side strips and rank badges
@@ -24,7 +24,7 @@ The validated v1.2.0 build preserves and corrects:
 - Practice infinite timer and combo/damage text
 - Gold Rush `REWARD` and `ATTACK VARIATION` labels
 - mode-specific fight HUD used by Arcade, Story, Ghost Battle, Practice, and Gold Rush
-- custom replacement-texture/font behavior validated during development
+- custom replacement textures/fonts
 
 Camera framing remains optional and separate through CWCheat presets.
 
@@ -38,7 +38,7 @@ Camera framing remains optional and separate through CWCheat presets.
 6. Cold-boot **Tekken 6 USA (`ULUS10466`)**.
 7. Do not enable legacy v1.0.0 manual aspect-ratio CWCheats at the same time as the plugin.
 
-The release archive contains the production plugin filename:
+The plugin is installed at:
 
 ```text
 PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx
@@ -61,11 +61,11 @@ Camera cheats are optional. Automatic aspect/HUD correction works independently 
 
 Tekken 6's stock presentation is based on a 16:9 logical frame. The plugin asks PPSSPP for the current landscape display aspect and derives the correction at runtime rather than selecting from a fixed list of phone or monitor ratios.
 
-The 3D projection is patched to PPSSPP's reported display aspect. For HUD paths that need correction, the validated AutoHUD implementation applies aspect-derived horizontal scale and left/center/right anchoring while preserving vertical geometry and mode-specific behavior.
+The 3D projection is patched to PPSSPP's reported display aspect. For HUD paths that need correction, AutoHUD applies aspect-derived horizontal scaling and left/center/right anchoring while preserving vertical geometry and mode-specific behavior.
 
 ## Validation
 
-The exact v1.2.0 PRX was validated on-device across:
+v1.2.0 was tested on-device in:
 
 - Arcade
 - Story
@@ -75,7 +75,7 @@ The exact v1.2.0 PRX was validated on-device across:
 
 Validation included HP fill, Practice combo/hit text, Gold Rush battle labels, main-menu text stability, and custom replacement-texture/font behavior, with no observed regression in that test sweep.
 
-The implementation is aspect-derived rather than fixed to 20:9. The release target device used an approximately 20:9 presentation; other display ratios were not independently device-tested during this release cycle.
+The implementation is aspect-derived rather than fixed to 20:9. Testing was performed on an approximately 20:9 display; other display ratios have not yet been independently tested.
 
 ## Compatibility
 
@@ -90,13 +90,13 @@ Other regional versions are not currently supported.
 
 - v1.2.0 focuses on the persistent fight HUD. Some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.
 - The package's `ULUS10466.ini` contains camera presets only. Merge it manually if you maintain other custom cheats.
-- Cross-aspect visual validation beyond the release test device remains welcome.
+- Other display ratios have not yet been independently tested.
 
 ## Previous releases
 
 - **v1.1.0:** automatic 3D aspect correction; original 2D HUD remained uncorrected.
 - **v1.0.0:** manual aspect-ratio CWCheats plus camera presets.
 
-## Development
+## Technical notes
 
-The exact device-validated v1.2.0 PRX is the authoritative release artifact. The sanitized AutoHUD investigation and release provenance are documented in [`research/v1.2.0-autohud.md`](research/v1.2.0-autohud.md).
+The AutoHUD reverse-engineering and implementation process is documented in [`research/v1.2.0-autohud.md`](research/v1.2.0-autohud.md).
