@@ -15,7 +15,7 @@ EXP6 integrated PRX                ACCEPTED / DEVICE VALIDATED
 PT_LOAD p_memsz                     0x0EB0
 ```
 
-The authoritative artifact, hashes, architecture, and regression policy are documented in [`CHECKPOINT_EXP6.md`](CHECKPOINT_EXP6.md).
+Checkpoint hashes, architecture, and regression policy: [`checkpoint-exp6.md`](checkpoint-exp6.md).
 
 The older [`CHECKPOINT_INFINITY_ONLY.md`](CHECKPOINT_INFINITY_ONLY.md) remains the simplified EXP5 fallback.
 
