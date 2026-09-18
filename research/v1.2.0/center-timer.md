@@ -1,5 +1,3 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # Center round timer
 
 ## Status
