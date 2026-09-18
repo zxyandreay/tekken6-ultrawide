@@ -1,5 +1,3 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # Fight-HUD reverse-engineering notes
 
 ## Scope
@@ -289,7 +287,7 @@ Story P2 LARS:   x=381..432, y=28..44, 51x16
 Arcade P2 ASUKA: x=343..445, y=28..44, 102x16
 ```
 
-The recovered authored family is:
+The authored family is:
 
 ```text
 y=28
