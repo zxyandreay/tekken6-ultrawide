@@ -1,54 +1,47 @@
 # Research documentation
 
-This directory preserves the technical investigations behind the public releases.
+This directory preserves the technical work behind the released Tekken 6 PPSSPP ultrawide plugin.
 
-## v1.1.0
+The goal is to document **how each problem was reverse-engineered and solved**: ownership discovery, controlled experiments, failed hypotheses, implementation constraints, and the final validated design.
+
+## v1.1.0 — automatic 3D aspect correction
 
 [`v1.1.0-auto-aspect-abi.md`](v1.1.0-auto-aspect-abi.md)
 
-Documents the PPSSPP automatic-aspect query work, including the six-argument `sceIoDevctl` ABI issue found during temporary non-PSPDEV testing and the path that produced the validated automatic 3D correction.
+Covers the PPSSPP runtime-aspect query, the six-argument `sceIoDevctl` ABI issue encountered during development, and the automatic 3D projection path that became the foundation for AutoHUD.
 
-## v1.2.0 AutoHUD
+## v1.2.0 — HUD correction / AutoHUD
 
 [`v1.2.0-autohud.md`](v1.2.0-autohud.md)
 
-**Detailed archive:** [`v1.2.0/README.md`](v1.2.0/README.md)
+The end-to-end engineering narrative. It explains:
 
-The detailed reverse-engineering and implementation record for the v1.2.0 battle-HUD work. It covers:
+- why the 3D aspect fix could not correct screen-space HUD geometry;
+- how LEFT/CENTER/RIGHT semantic anchoring was derived;
+- how HP shell and fill ownership were separated;
+- how side strips, rank badges, round markers, winner glow, timer, and character names were identified;
+- how Practice and Gold Rush text required separate glyph-path work;
+- why the compact `0x0EB0` module footprint became a functional requirement;
+- how EXP6 became the fixed-20:9 visual reference;
+- why the first AutoHUD builds lost HP fill;
+- how downstream packet tracing found the stale rejection-branch bug;
+- why EXP16 regressed text;
+- and why EXP17 became the final v1.2.0 architecture.
 
-- semantic LEFT/CENTER/RIGHT HUD composition;
-- HP shell and HP fill ownership;
-- side strips and rank badges;
-- round markers and winner glow;
-- center-timer ABI;
-- character-name anchoring;
-- Practice and Gold Rush font/glyph research;
-- the `0x0EB0` memory-footprint constraint;
-- EXP6 as the fixed-20:9 reference;
-- EXP11–EXP14 AutoHUD regressions;
-- the EXP14 stale-branch HP-fill root cause;
-- EXP15 repair;
-- rejected EXP16 self-patching design;
-- final EXP17 dynamic HP architecture;
-- release validation and source/artifact limitations.
+### Detailed v1.2.0 archive
 
-[`v1.2.0-autohud-timeline.md`](v1.2.0-autohud-timeline.md)
+[`v1.2.0/README.md`](v1.2.0/README.md)
 
-Chronological milestone list with the important recovered research commit SHAs.
+Use this when you need the deeper subsystem notes, test-build evidence, HP packet-tracing investigation, or probe methodology.
 
-## Provenance note
-
-The temporary HUD research branches were deleted after v1.2.0 release cleanup. Their commits were still addressable by SHA, allowing the detailed v1.2.0 documentation to be reconstructed from the original notes and commit history.
-
-The current documentation intentionally omits local network addresses, debugger endpoints, device identifiers, and workstation paths.
+The archive preserves the useful engineering record rather than every temporary branch or raw debugger capture.
 
 ## Source versus release binaries
 
-The exact device-validated release PRXs are authoritative for the published versions. The readable source tree is not automatically assumed to be byte-identical to every compact hand-integrated research binary.
+The exact device-validated release PRXs are authoritative for the published versions.
 
-For v1.2.0 specifically, a future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, `0x0EB0` resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and official-PPSSPP stability before being considered equivalent to the published artifact.
+For v1.2.0, a future clean source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, `0x0EB0` resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and PPSSPP stability before being considered equivalent to the published artifact.
 
+## Privacy
 
-### Recovered detailed v1.2.0 archive
-
-The first post-release summary was intentionally compact and did not preserve enough of the experiment-by-experiment process. The detailed archive under [`v1.2.0/`](v1.2.0/) restores the original subsystem notes plus retained test-build evidence, including the RoundWin, Timer, SideNames, ModeHUD, compact EXP1–EXP6, and AutoHUD EXP11–EXP17 progression.
+Research documentation intentionally omits local network addresses, debugger endpoints, device identifiers, and workstation paths.
