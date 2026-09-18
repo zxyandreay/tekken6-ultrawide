@@ -1,14 +1,12 @@
 # AutoHUD HP-fill investigation
 
-This is the sanitized technical record of the HP-fill regression that appeared during the automatic-aspect HUD experiments.
-
-The original research note also contained local debugger/network troubleshooting. Those environment-specific details are intentionally omitted here. The renderer, MIPS, packet, and binary findings are preserved.
+This record follows the HP-fill regression that appeared during automatic-aspect HUD experiments from the gauge owner through final sprite submission.
 
 ---
 
 ## 1. Known-good fixed-ratio comparator
 
-A later fixed-20:9 checkpoint was used as the known-good comparator for the HP regression investigation. In the retained artifact set this comparator is the build labeled EXP6; it is not the starting baseline of the HUD research.
+A known-good fixed-20:9 checkpoint was used as the comparator for the HP regression investigation.
 
 Relevant validated behavior:
 
@@ -291,11 +289,11 @@ The missing fill had to be later.
 
 ---
 
-# 8. Working fixed-ratio downstream comparator
+# 8. Known-good fixed-ratio downstream path
 
 The next probe followed a known-good call from the fixed-ratio comparator farther downstream.
 
-Recovered flow:
+Observed flow:
 
 ```text
 0x08928FF4   HP renderer entry
@@ -496,7 +494,7 @@ s = (16/9) / detected_aspect
 d = 1 - s
 ```
 
-Recovered from the AutoHUD binary:
+Derived from the AutoHUD binary:
 
 ```text
 hp_shift = 6.528055667877197 * d
