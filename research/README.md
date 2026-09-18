@@ -1,47 +1,46 @@
 # Research documentation
 
-This directory preserves the technical work behind the released Tekken 6 PPSSPP ultrawide plugin.
+This directory preserves the technical investigations behind the Tekken 6 PPSSPP ultrawide plugin.
 
-The goal is to document **how each problem was reverse-engineered and solved**: ownership discovery, controlled experiments, failed hypotheses, implementation constraints, and the final validated design.
+The documentation is organized around how the problems were investigated and solved, not around treating a later test build as the project baseline.
 
 ## v1.1.0 — automatic 3D aspect correction
 
-[`v1.1.0-auto-aspect-abi.md`](v1.1.0-auto-aspect-abi.md)
-
-Covers the PPSSPP runtime-aspect query, the six-argument `sceIoDevctl` ABI issue encountered during development, and the automatic 3D projection path that became the foundation for AutoHUD.
+See v1.1.0-auto-aspect-abi.md for the runtime aspect-query/plugin work that replaced the fixed 3D CWCheat with automatic PPSSPP aspect detection.
 
 ## v1.2.0 — HUD correction / AutoHUD
 
-[`v1.2.0-autohud.md`](v1.2.0-autohud.md)
+See v1.2.0-autohud.md for the main end-to-end research narrative.
 
-The end-to-end engineering narrative. It explains:
+It starts from the actual preserved baseline: a known-good 3D-only CWCheat with stretched HUD/UI and no known HUD transform.
 
-- why the 3D aspect fix could not correct screen-space HUD geometry;
-- how LEFT/CENTER/RIGHT semantic anchoring was derived;
-- how HP shell and fill ownership were separated;
-- how side strips, rank badges, round markers, winner glow, timer, and character names were identified;
-- how Practice and Gold Rush text required separate glyph-path work;
-- why the compact `0x0EB0` module footprint became a functional requirement;
-- how EXP6 became the fixed-20:9 visual reference;
-- why the first AutoHUD builds lost HP fill;
-- how downstream packet tracing found the stale rejection-branch bug;
-- why EXP16 regressed text;
-- and why EXP17 became the final v1.2.0 architecture.
+### Detailed archive
 
-### Detailed v1.2.0 archive
+See v1.2.0/README.md for:
 
-[`v1.2.0/README.md`](v1.2.0/README.md)
+- earliest projection/screen-space/native-2D research;
+- battle-HUD ownership mapping;
+- HP shell/fill research;
+- winner-orb and glow work;
+- timer ABI findings;
+- character-name anchoring;
+- Practice/Gold Rush glyph research;
+- retained test-build evidence;
+- HP AutoHUD packet tracing;
+- probe methodology.
 
-Use this when you need the deeper subsystem notes, test-build evidence, HP packet-tracing investigation, or probe methodology.
+## Evidence policy
 
-The archive preserves the useful engineering record rather than every temporary branch or raw debugger capture.
+The research docs distinguish between verified/recovered results from old commits, retained artifacts, or runtime captures; experiment intent where a test package survives but the exact device result does not; and final validated behavior from the release test sweep.
 
-## Source versus release binaries
+Missing history is not filled with guesses.
 
-The exact device-validated release PRXs are authoritative for the published versions.
+## Source versus release binary
 
-For v1.2.0, a future clean source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, `0x0EB0` resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and PPSSPP stability before being considered equivalent to the published artifact.
+The exact device-validated v1.2.0 PRX remains authoritative for the release.
+
+A future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, compact resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and PPSSPP stability before being considered equivalent.
 
 ## Privacy
 
-Research documentation intentionally omits local network addresses, debugger endpoints, device identifiers, and workstation paths.
+Local network addresses, debugger endpoints, device identifiers, and workstation paths are intentionally omitted.
