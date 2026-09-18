@@ -1,4 +1,4 @@
-> Recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
+> Historical later-phase checkpoint recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
 
 # HUD research checkpoint: EXP6 dual-stage mode-font build
 
@@ -335,8 +335,8 @@ Minimum sequence:
 
 From this point forward:
 
-- treat EXP6 visual behavior as the frozen research baseline;
-- keep EXP5 as the simplified fallback baseline;
+- treat this fixed-ratio behavior as the frozen comparison checkpoint for subsequent experiments;
+- keep the preceding simplified build as a fallback checkpoint;
 - do not modify `main` or published `v1.1.0` while this remains research;
 - keep HUD work on `research/hud-correction`;
 - do not use GitHub Actions for this research session;
