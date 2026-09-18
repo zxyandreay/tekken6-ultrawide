@@ -444,7 +444,7 @@ The hook code remained linked and a BSS pad kept allocation equal to v10.1.
 
 Interpretation planned by the test:
 
-- textures recover -> executed font hook is causal;
+- textures return -> executed font hook is causal;
 - textures still fail -> enlarged module allocation/memory layout is causal.
 
 The subsequent memory-size-only A/B established the second result.
@@ -660,7 +660,7 @@ PRX SHA-256:
 44c80a417e3602d4e9b8553cdcf89be9348e208582c28c0e3b7a9dcfd8ee3ea2
 ```
 
-EXP5 deliberately removed the mode-font correction and retained only the validated Practice infinity rule.
+EXP5 deliberately removed the mode-font correction and kept only the validated Practice infinity rule.
 
 It served as the stable fallback while the font architecture was still unresolved.
 
