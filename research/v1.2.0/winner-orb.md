@@ -200,7 +200,7 @@ Therefore:
 - transient P1/P2 winner glow is solved;
 - the round-win orb subsystem is considered complete.
 
-## Rejected paths retained as lessons
+## Rejected paths and lessons
 
 Several earlier approaches were useful only to eliminate possibilities:
 
