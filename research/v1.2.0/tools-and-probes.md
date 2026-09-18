@@ -340,7 +340,7 @@ Result:
 Purpose:
 
 - read live gauge coefficient instructions;
-- reconstruct detected aspect;
+- derive detected aspect;
 - compare actual patched float bits to expected aspect-derived HP values.
 
 This separated "self-patch math works" from "the rest of the build is regression-free."
