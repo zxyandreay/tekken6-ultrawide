@@ -6,9 +6,9 @@ The original research note also contained local debugger/network troubleshooting
 
 ---
 
-## 1. Stable reference: EXP6
+## 1. Known-good fixed-ratio comparator
 
-EXP6 was the accepted fixed-20:9 HUD reference.
+A later fixed-20:9 checkpoint was used as the known-good comparator for the HP regression investigation. In the retained artifact set this comparator is the build labeled EXP6; it is not the starting baseline of the HUD research.
 
 Relevant validated behavior:
 
@@ -291,9 +291,9 @@ The missing fill had to be later.
 
 ---
 
-# 8. Working EXP6 downstream baseline
+# 8. Working fixed-ratio downstream comparator
 
-The next probe followed a known-good EXP6 call farther.
+The next probe followed a known-good call from the fixed-ratio comparator farther downstream.
 
 Recovered flow:
 
