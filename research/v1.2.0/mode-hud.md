@@ -147,7 +147,7 @@ However, Practice infinity placement was still wrong.
 
 ### EXP3
 
-EXP3 retained the early 80% scale and corrected the Practice infinity placement.
+EXP3 kept the early 80% scale and corrected the Practice infinity placement.
 
 Device result:
 
@@ -178,7 +178,7 @@ Therefore EXP4 solved placement/state consistency but not the complete visible d
 
 ### EXP5
 
-EXP5 removed the mode-font correction and retained only the Practice infinity correction.
+EXP5 removed the mode-font correction and kept only the Practice infinity correction.
 
 It provided a minimal stable fallback for further font experiments.
 
@@ -273,7 +273,7 @@ Practice infinity                   correct
 Practice DAMAGE/HIT COMBO text      visibly de-stretched
 Gold target labels                  visibly de-stretched
 Gold target placement               correct
-normal battle-HUD fixes             retained
+normal battle-HUD fixes             unchanged
 ```
 
 This makes EXP6 the current accepted mode-HUD solution.
