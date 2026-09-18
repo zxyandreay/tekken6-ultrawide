@@ -1,5 +1,3 @@
-> Historical later-phase checkpoint recovered from the original HUD research history (snapshot d5e6c73). This copy is preserved on main for v1.2.0 provenance.
-
 # HUD research checkpoint: EXP6 dual-stage mode-font build
 
 Date: 2026-09-17
@@ -51,7 +49,7 @@ The `0x0EB0` resident-memory ceiling remains mandatory because the earlier contr
 
 EXP6 was tested on the official PPSSPP release after the earlier dev/debug-build crash issue had been isolated.
 
-User device result:
+Test result:
 
 ```text
 EXP6 worked.
