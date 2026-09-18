@@ -390,4 +390,4 @@ Does the broken AutoHUD candidate reach the same HP renderer state as the known-
 Does the packet reach stock submission?
 ```
 
-That approach avoided large speculative rewrites and produced the sequence of falsifiable experiments documented in the build archive.
+That approach avoided large speculative rewrites and kept each build tied to one falsifiable question.
