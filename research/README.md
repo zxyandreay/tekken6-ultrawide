@@ -1,46 +1,40 @@
 # Research documentation
 
-This directory preserves the technical investigations behind the Tekken 6 PPSSPP ultrawide plugin.
+Technical notes for the Tekken 6 PPSSPP ultrawide plugin.
 
-The documentation is organized around how the problems were investigated and solved, not around treating a later test build as the project baseline.
+The files are organized around the engineering process: initial state, hypothesis, test, observation, conclusion, and implementation.
 
 ## v1.1.0 — automatic 3D aspect correction
 
-See v1.1.0-auto-aspect-abi.md for the runtime aspect-query/plugin work that replaced the fixed 3D CWCheat with automatic PPSSPP aspect detection.
+See `v1.1.0-auto-aspect-abi.md` for the runtime aspect-query work that replaced the fixed 3D CWCheat with automatic PPSSPP aspect detection.
 
 ## v1.2.0 — HUD correction / AutoHUD
 
-See v1.2.0-autohud.md for the main end-to-end research narrative.
+See `v1.2.0-autohud.md` for the end-to-end HUD-correction research.
 
-It starts from the actual preserved baseline: a known-good 3D-only CWCheat with stretched HUD/UI and no known HUD transform.
+The work starts from a known-good 3D-only 20:9 patch with stretched HUD/UI and no identified HUD transform, then follows the projection, screen-space, compositor, sprite, text, and packet paths that led to AutoHUD.
 
-### Detailed archive
+### Detailed notes
 
-See v1.2.0/README.md for:
+See `v1.2.0/README.md` for:
 
-- earliest projection/screen-space/native-2D research;
+- projection, screen-space, and native-2D experiments;
 - battle-HUD ownership mapping;
 - HP shell/fill research;
 - winner-orb and glow work;
 - timer ABI findings;
 - character-name anchoring;
 - Practice/Gold Rush glyph research;
-- retained test-build evidence;
+- test-build records;
 - HP AutoHUD packet tracing;
 - probe methodology.
 
-## Evidence policy
+## Documentation convention
 
-The research docs distinguish between verified/recovered results from old commits, retained artifacts, or runtime captures; experiment intent where a test package survives but the exact device result does not; and final validated behavior from the release test sweep.
-
-Missing history is not filled with guesses.
+Each experiment records only what was established by static analysis, a controlled test, a runtime capture, or a validated build. If a test result was not recorded, it is marked as such rather than inferred.
 
 ## Source versus release binary
 
-The exact device-validated v1.2.0 PRX remains authoritative for the release.
+The exact device-validated v1.2.0 PRX is authoritative for the release.
 
 A future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, compact resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and PPSSPP stability before being considered equivalent.
-
-## Privacy
-
-Local network addresses, debugger endpoints, device identifiers, and workstation paths are intentionally omitted.
