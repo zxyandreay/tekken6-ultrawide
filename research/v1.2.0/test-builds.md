@@ -1,6 +1,6 @@
-# v1.2.0 HUD research test-build archive
+# v1.2.0 HUD research test builds
 
-This file records the test builds used during HUD/AutoHUD research.
+Experiment builds used during HUD/AutoHUD research.
 
 Each entry includes the build purpose, checksum, relevant binary layout, and recorded test result. If an experiment note does not contain a result, the entry is marked `Result: not recorded`.
 
@@ -836,7 +836,7 @@ This was the decisive isolation result:
 
 > the missing HP fill was outside the gauge hook.
 
-That result triggered the downstream runtime packet-tracing investigation documented in [`hp-fill-auto-aspect.md`](hp-fill-auto-aspect.md).
+That result triggered the downstream runtime packet-tracing investigation in [`hp-fill-auto-aspect.md`](hp-fill-auto-aspect.md).
 
 ---
 
