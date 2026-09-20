@@ -73,6 +73,16 @@ const STOCK_CHECKS = [
   [0x08946BC8, 0x3C013FE3, '3d aspect #3 lui'], [0x08946BCC, 0x34218E39, '3d aspect #3 ori'],
   [0x08947D90, 0x3C013FE3, '3d aspect #4 lui'], [0x08947D94, 0x34218E39, '3d aspect #4 ori'],
 
+  [0x0892D9F8, 0x27BDFFE0, 'slot builder entry'],
+  [0x08AB9380, 0x27BDFFC0, 'rectangle builder entry'],
+  [0x08928FF4, 0x3C0308BA, 'gauge submit entry'],
+  [0x0892D3E0, 0x27BDFF80, 'gauge renderer entry'],
+  [0x08825EAC, 0x0A2B6DAA, 'stock sprite submit entry'],
+  [0x0892D72C, 0x27BDFFF0, 'timer renderer entry'],
+  [0x08AE94A4, 0x27BDFFD0, 'winner glow converter entry'],
+  [0x08970A90, 0x96CB02C8, 'text scale early instruction'],
+  [0x08970B24, 0x8EC402C8, 'text packed late instruction'],
+
   [0x08929854, 0x0E24B67E, 'slot route jal 1'], [0x08929958, 0x0E24B67E, 'slot route jal 2'],
   [0x089299E8, 0x0E24B67E, 'slot route jal 3'], [0x08929DF0, 0x0E24B67E, 'slot route jal 4'],
   [0x08929F3C, 0x0E24B67E, 'slot route jal 5'], [0x0892A10C, 0x0E24B67E, 'slot route jal 6'],
@@ -185,8 +195,10 @@ class PPSSPPDebugger {
   }
 
   async readU32(address) {
-    const r = await this.request('memory.read_u32', { address });
-    return (r.uintValue ?? r.value) >>> 0;
+    // memory.read_u32 preserves PPSSPP JIT/replacement opcodes.  Stock code
+    // verification needs the original guest instruction instead.
+    const bytes = await this.readBytes(address, 4, false);
+    return bytes.readUInt32LE(0);
   }
 
   async readBytes(address, size, replacements = true) {
@@ -285,11 +297,19 @@ class CensusRunner {
 
   async #onEvent(msg) {
     if (!this.phase || this.captureBusy) return;
-    if (msg.event !== 'cpu.stepping' || !msg.hit || msg.hit.kind !== 'exec') return;
+    if (msg.event !== 'cpu.stepping') return;
 
-    const bpAddress = (msg.hit.breakpoint?.start ?? msg.hit.address ?? msg.pc) >>> 0;
-    const target = this.phase.targets.find(t => t.address === bpAddress);
+    // PPSSPP v1.20.4 can omit the stop reason and structured hit details, but
+    // reports the stopped PC. Only accept an address armed by this phase.
+    const candidateAddresses = [
+      msg.hit?.breakpoint?.start,
+      msg.hit?.address,
+      msg.relatedAddress,
+      msg.pc,
+    ].filter(Number.isInteger).map(address => address >>> 0);
+    const target = this.phase.targets.find(t => candidateAddresses.includes(t.address));
     if (!target) return;
+    const bpAddress = target.address;
 
     this.captureBusy = true;
     try {
