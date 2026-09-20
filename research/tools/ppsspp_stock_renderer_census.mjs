@@ -327,7 +327,7 @@ class CensusRunner {
       ? await safeReadBytes(this.client, ra - 0x10, 0x30, false)
       : null;
 
-    const pointerRegs = ['a0', 'a1', 'a2', 'a3', 't0', 't1', 't3', 's0', 's1', 's2', 's3'];
+    const pointerRegs = ['a0', 'a1', 'a2', 'a3', 't0', 't1', 't2', 't3', 's0', 's1', 's2', 's3'];
     const seen = new Set();
     const pointerSnapshots = [];
     for (const regName of pointerRegs) {
