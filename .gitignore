@@ -12,3 +12,6 @@ UMD_DATA.BIN
 .DS_Store
 Thumbs.db
 *.log
+
+# Local renderer-census captures
+research/captures/*.json
