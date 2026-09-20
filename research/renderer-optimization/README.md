@@ -2,7 +2,12 @@
 
 This branch is for finding a smaller Tekken 6 AutoHUD/ultrawide architecture by comparing a completely stock runtime against the v1.2.0 implementation.
 
-The first tool is `research/tools/ppsspp_stock_renderer_census.mjs`. It connects to PPSSPP's WebSocket remote debugger and captures read-only CPU/register/memory context at renderer paths already identified during v1.2.0 research.
+The first tools are:
+
+- `research/tools/ppsspp_debugger_smoke_test.mjs` — verifies TCP, WebSocket upgrade, required subprotocol, PPSSPP version, game identity, and CPU status without touching PSP memory.
+- `research/tools/ppsspp_stock_renderer_census.mjs` — captures read-only CPU/register/memory context at renderer paths already identified during v1.2.0 research.
+
+The first completed stock run and preliminary architectural interpretation are recorded in [`stock-census-2026-09-20.md`](stock-census-2026-09-20.md).
 
 ## Clean-control requirements
 
@@ -22,6 +27,12 @@ The probe does not patch Tekken memory. It temporarily adds/removes debugger exe
 ## Run
 
 From the repository root:
+
+```powershell
+node research/tools/ppsspp_debugger_smoke_test.mjs <PHONE_IP>:<PORT>
+```
+
+Only proceed to the census after the smoke test reports the expected game and a responsive CPU.
 
 ```powershell
 node research/tools/ppsspp_stock_renderer_census.mjs <PHONE_IP>:<PORT>
@@ -54,3 +65,10 @@ research/captures/stock-renderer-census-<timestamp>.json
 ```
 
 Keep the JSON unchanged and send it back for comparison against the v1.2.0 hook/packet architecture. Captures are intentionally ignored by Git.
+
+## PPSSPP v1.20.4 debugger notes
+
+- `memory.read_u32` may return a live JIT/emuhack replacement word instead of the original guest instruction. Stock code verification uses `memory.read` with `replacements: false` and decodes the returned bytes as little-endian words.
+- Execution-breakpoint stops are delivered as `cpu.stepping`. v1.20.4 may omit newer structured hit details, so the census matches the stopped PC/related address only against breakpoints owned by the active phase.
+- Pausing PPSSPP from its UI can leave the TCP port open while HTTP/WebSocket requests stop being serviced. Keep PPSSPP running when connecting; let debugger breakpoints perform the temporary capture pauses.
+- The debugger emits unsolicited events such as analog-input state. Ticketed responses must be separated from those broadcasts.
