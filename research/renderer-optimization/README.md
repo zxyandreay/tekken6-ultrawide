@@ -6,10 +6,13 @@ The first tools are:
 
 - `research/tools/ppsspp_debugger_smoke_test.mjs` — verifies TCP, WebSocket upgrade, required subprotocol, PPSSPP version, game identity, and CPU status without touching PSP memory.
 - `research/tools/ppsspp_stock_renderer_census.mjs` — captures read-only CPU/register/memory context at renderer paths already identified during v1.2.0 research.
+- `research/tools/ppsspp_hp_downstream_ab_probe.mjs` — compares stock and released-v1.2.0 HP, rank, and side-strip packets at the shared sprite dispatcher, including same-execution gauge-width pairs.
 
 The first completed stock run and preliminary architectural interpretation are recorded in [`stock-census-2026-09-20.md`](stock-census-2026-09-20.md).
 
 The reconstructed development order behind the safe-area proof, fixed-20:9 EXP6 checkpoint, and released v1.2.0 AutoHUD is recorded in [`v1.2.0-hud-development-history.md`](v1.2.0-hud-development-history.md). Read it before interpreting plugin-era side-strip/rank captures as stock renderer evidence.
+
+The focused HP A/B results and exact proposed downstream transform are recorded in [`hp-downstream-ab-2026-09-21.md`](hp-downstream-ab-2026-09-21.md).
 
 ## Clean-control requirements
 
