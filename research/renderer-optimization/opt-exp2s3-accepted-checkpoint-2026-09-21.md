@@ -1,8 +1,8 @@
-# OPT-EXP2S3 accepted optimization checkpoint — 2026-09-21
+# OPT-EXP2S3 optimization checkpoint — 2026-09-21
 
-## Status
+## Corrected status
 
-Accepted on device.
+Accepted for the startup/table-compression and general HUD behavior, but **NOT accepted as a winner-glow fix**.
 
 Build:
 
@@ -17,131 +17,73 @@ one PT_LOAD
 p_filesz = p_memsz = 0x0EB0
 ```
 
-The fixed resident-allocation rule remains unchanged.
+## Device-result correction
 
-## Device result
+An earlier test report stated that the transient rotating winner glow/halo followed the correct newly earned orb.
 
-The OPT-EXP2S3 winner-glow generalization was tested on device after the corrected OPT-EXP2S2 startup-table compression.
+That report was later rechecked and withdrawn.
 
-Confirmed:
+Current verified result:
 
 - Tekken 6 starts normally;
 - battle HUD appears normally;
-- earned round/orb placement is substantially aligned again;
-- the transient rotating winner glow/halo now follows the correct newly earned orb;
-- the previous residual spin on the wrong orb is gone.
+- earned-round/orb rectangle placement is substantially aligned;
+- the transient rotating winner glow/halo is still on the wrong orb.
 
-This validates the generalized winner-glow classifier.
+Therefore the EXP2S3 X-gate generalization did **not** solve the winner-glow problem.
 
-## What OPT-EXP2S3 contains
+Do not cite EXP2S3 as a halo-correct checkpoint.
 
-The accepted line consists of three successful optimization/correction steps relative to official v1.2.0.
+## What remains accepted
 
-### 1. OPT-EXP1 — downstream HP consolidation
+### OPT-EXP1 — downstream HP consolidation
 
-Validated result:
+Validated:
 
-- the two upstream gauge-owner hooks at `0x0892C1F0` and `0x0892C26C` are no longer installed;
+- two upstream gauge-owner hooks are no longer installed;
 - stock gauge rendering remains intact;
-- HP shell/fill ownership is classified at the existing downstream shared-sprite dispatcher;
-- the exact v1.2.0 HP shift/scale behavior is reproduced there;
-- the fixed one-LOAD `0x0EB0` image remains unchanged in size.
+- HP transform is handled at the existing downstream shared-sprite path;
+- fixed one-LOAD 0x0EB0 image remains unchanged in size.
 
-Important accounting rule:
+### OPT-EXP2S2 — slot installer compression
 
-The old upstream wrapper region was reused for the downstream HP handler. It is architectural simplification, not free capacity.
+Validated after correcting all three table walkers to +8-byte stride.
 
-### 2. OPT-EXP2S2 — safe slot installer compression
+The battle-time slot topology remains unchanged from the known-good release architecture.
 
-The original slot patch table contained thirteen 12-byte records:
+### OPT-EXP2S3 — glow classifier experiment
 
-```text
-address       4
-expected word 4
-kind          4
-              --
-              12 bytes
-```
+EXP2S3 removed the historical first-slot-only X gate while preserving:
 
-The `kind` value is redundant because the expected instruction opcode already identifies J versus JAL.
-
-The accepted table is therefore:
-
-```text
-address       4
-expected word 4
-              --
-               8 bytes
-```
-
-All three startup table walkers use an 8-byte stride:
-
-- validation;
-- installation;
-- cache invalidation.
-
-The earlier EXP2S startup hang was caused by leaving the cache-invalidation loop at +12. OPT-EXP2S2 corrected that to +8.
-
-The battle-time slot topology remains identical to v1.2.0/OPT-EXP1:
-
-- thirteen original slot hooks;
-- original slot wrapper;
-- original scope lifetime.
-
-### 3. OPT-EXP2S3 — winner-glow slot generalization
-
-The historical winner-glow hook was validated only against the original first-win P1/P2 X-center families.
-
-The ordinary earned-orb rectangle code already covered a broader set of authored round slots.
-
-Re-analysis of the archived bilateral round-win captures showed that the combination of:
-
-```text
-4 vertices
-exact 64x64 UV corner pattern
-winner-orb Y row
-```
-
-was sufficient to isolate the same rotating winner-glow family in the captures.
-
-OPT-EXP2S3 therefore removed only the obsolete first-slot X-family gate.
-
-Preserved:
-
-- vertex-count gate;
-- exact UV identity;
-- Y-row gate;
+- 4-vertex requirement;
+- exact 64x64 UV pattern;
+- winner-row Y gate;
 - dynamic CENTER transform;
-- temporary source-X transform;
-- original converter call;
-- source-X restoration.
+- source-X save/restore;
+- original converter call.
 
-Device validation confirms the halo now follows the correct earned orb.
+The experiment did not visibly solve the residual spinning-halo placement.
 
-## Rejected optimization line
+It remains useful as evidence that the first-slot X gate was not the sole cause.
 
-Do not reuse these results as available-space evidence:
+## Important historical correction
 
-- OPT-EXP2;
-- OPT-EXP2R;
-- OPT-EXP2R2.
+RoundWin v7 and released v1.2.0 do **not** contain the same winner-glow implementation.
 
-Those builds attempted runtime slot-route consolidation.
+RoundWin v7 used a direct fixed-20:9 transform:
 
-Observed failures included:
+```text
+x' = 0.8*x + 48
+```
 
-- wrong round-win compositing;
-- wrong residual halo relationship;
-- renderer ABI corruption;
-- an unsafe PRX-local trampoline;
-- PPSSPP force-close at battle-HUD startup.
+Later AutoHUD work rewrote that path to load dynamic scale/center values from the shared parameter block.
 
-The previously quoted 216/236-byte capacity belonged to that rejected architecture and is not part of the accepted byte budget.
+Therefore previous wording that the v7 winner-glow fix simply carried forward unchanged into v1.2.0 was inaccurate.
 
-## Current accepted baseline
+## Baseline rule
 
-For further optimization work, use OPT-EXP2S3 as the checkpoint.
+Use OPT-EXP2S3 only as a stable optimization baseline for startup/table and general HUD behavior.
 
-Do not restart from rejected EXP2/EXP2R/EXP2R2 binaries.
+Winner glow must be revalidated independently.
 
-The next proposed target is the two-stage Practice/Gold mode-font implementation, but only after the current internal-space audit is treated as the authoritative capacity record.
+No GitHub Actions are used.
