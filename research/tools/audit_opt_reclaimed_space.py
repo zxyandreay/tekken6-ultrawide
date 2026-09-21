@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Audit accepted internal capacity in Tekken6Ultrawide optimization builds."""
+"""Audit accepted internal capacity in Tekken6Ultrawide optimization builds.
+
+This tool intentionally distinguishes hard-free bytes from merely unreachable
+code and startup-inline NOP opportunities. It does not treat all three classes
+as one generic "free space" number.
+"""
 
 from __future__ import annotations
 
@@ -10,9 +15,17 @@ from pathlib import Path
 
 LOAD_FILE_OFFSET = 0x60
 LOAD_SIZE = 0x0EB0
+REL_TEXT_FILE_OFFSET = 0x1280
+REL_TEXT_SIZE = 0x1D0
+MODULE_EXEC_BASE = 0x08800000
 
 OFFICIAL_SHA = "311720e8aa115865343df4fcd13fa5e9f8f074ff1e05348ab165e9c6ef81ee75"
 EXP2S3_SHA = "7496824d8b6827ecb39589d37f966cf638cf9232058f6f8dc2a2f1db355a3805"
+
+GLOW_DEAD_START = 0x0D40
+GLOW_DEAD_END = 0x0D58
+
+BRANCH_OPS = {1, 4, 5, 6, 7, 20, 21, 22, 23}
 
 def u32(data: bytes, va: int) -> int:
     return struct.unpack_from("<I", data, LOAD_FILE_OFFSET + va)[0]
@@ -25,6 +38,53 @@ def check_layout(data: bytes) -> None:
     ph = struct.unpack_from("<IIIIIIII", data, phoff)
     if ph[0] != 1 or ph[1] != LOAD_FILE_OFFSET or ph[4] != LOAD_SIZE or ph[5] != LOAD_SIZE:
         raise RuntimeError("PT_LOAD invariant failed")
+
+def find_branch_entries(data: bytes, start: int, end: int) -> list[tuple[int, int]]:
+    refs: list[tuple[int, int]] = []
+    for va in range(0, LOAD_SIZE, 4):
+        word = u32(data, va)
+        op = word >> 26
+        if op not in BRANCH_OPS:
+            continue
+        imm = word & 0xFFFF
+        if imm & 0x8000:
+            imm -= 0x10000
+        target = va + 4 + imm * 4
+        if start <= target < end:
+            refs.append((va, target))
+    return refs
+
+def find_direct_jump_entries(data: bytes, start: int, end: int) -> list[tuple[int, int]]:
+    refs: list[tuple[int, int]] = []
+    abs_start = MODULE_EXEC_BASE + start
+    abs_end = MODULE_EXEC_BASE + end
+    for va in range(0, LOAD_SIZE, 4):
+        word = u32(data, va)
+        op = word >> 26
+        if op not in (2, 3):
+            continue
+        target = (word & 0x03FFFFFF) << 2
+        if abs_start <= target < abs_end:
+            refs.append((va, target))
+    return refs
+
+def find_embedded_pointers(data: bytes, start: int, end: int) -> list[tuple[int, int]]:
+    refs: list[tuple[int, int]] = []
+    abs_start = MODULE_EXEC_BASE + start
+    abs_end = MODULE_EXEC_BASE + end
+    for off in range(0, len(data) - 3, 4):
+        word = struct.unpack_from("<I", data, off)[0]
+        if start <= word < end or abs_start <= word < abs_end:
+            refs.append((off, word))
+    return refs
+
+def relocation_locations_in_range(data: bytes, start: int, end: int) -> list[int]:
+    refs: list[int] = []
+    for pos in range(REL_TEXT_FILE_OFFSET, REL_TEXT_FILE_OFFSET + REL_TEXT_SIZE, 8):
+        offset, info = struct.unpack_from("<II", data, pos)
+        if start <= offset < end and info != 0:
+            refs.append(offset)
+    return refs
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -48,11 +108,25 @@ def main() -> None:
     if len(table) != 52 or any(table):
         raise RuntimeError("52-byte table tail is not fully zero")
 
-    # B: generalized glow branches over the old X gate.
+    # B: generalized glow branches over old X classifier.
     if u32(accepted, 0x0D3C) != 0x10000006:
         raise RuntimeError("winner-glow bypass branch mismatch")
     if u32(accepted, 0x0D40) != 0:
         raise RuntimeError("winner-glow branch delay slot mismatch")
+
+    branch_refs = find_branch_entries(accepted, GLOW_DEAD_START, GLOW_DEAD_END)
+    jump_refs = find_direct_jump_entries(accepted, GLOW_DEAD_START, GLOW_DEAD_END)
+    pointer_refs = find_embedded_pointers(accepted, GLOW_DEAD_START, GLOW_DEAD_END)
+    reloc_refs = relocation_locations_in_range(accepted, GLOW_DEAD_START, GLOW_DEAD_END)
+
+    if branch_refs:
+        raise RuntimeError(f"alternate branch entries into glow-dead block: {branch_refs}")
+    if jump_refs:
+        raise RuntimeError(f"direct J/JAL entries into glow-dead block: {jump_refs}")
+    if pointer_refs:
+        raise RuntimeError(f"embedded pointers into glow-dead block: {pointer_refs}")
+    if reloc_refs:
+        raise RuntimeError(f"relocation sites inside glow-dead block: {reloc_refs}")
 
     # C: removed upstream HP installer writes.
     if u32(accepted, 0x03F0) != 0 or u32(accepted, 0x03F4) != 0:
@@ -62,16 +136,17 @@ def main() -> None:
     print("accepted:", EXP2S3_SHA)
     print("PT_LOAD: one segment, p_filesz=p_memsz=0x0EB0")
     print()
-    print("General reusable capacity:")
-    print("  0x0AC4..0x0AF7  hard-free table tail       52 bytes")
-    print("  0x0D40..0x0D57  dead glow X classifier     24 bytes")
-    print("                                             --------")
-    print("                                             76 bytes")
+    print("Hard-free general capacity:")
+    print("  0x0AC4..0x0AF7  zero table tail             52 bytes")
     print()
-    print("Startup-only instruction slots:")
+    print("Verified unreachable candidate:")
+    print("  0x0D40..0x0D57  old glow X classifier       24 bytes")
+    print("  xref audit: no branch/J/JAL/pointer/relocation entry")
+    print()
+    print("Startup-only inline opportunity:")
     print("  0x03F0..0x03F7  removed HP hook installs     8 bytes")
     print()
-    print("Total opportunity with context restrictions: 84 bytes")
+    print("Do not combine these into one generic free-space number.")
     print("Resident allocation reduction: 0 bytes")
 
 if __name__ == "__main__":
