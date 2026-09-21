@@ -1,8 +1,8 @@
-# OPT-EXP3A accepted checkpoint — 2026-09-21
+# OPT-EXP3A one-hook-font checkpoint — 2026-09-21
 
-## Status
+## Corrected status
 
-Accepted on device.
+Accepted for the Practice/Gold one-hook font architecture, but **NOT accepted as proof of winner-glow correctness**.
 
 Build:
 
@@ -17,20 +17,20 @@ one PT_LOAD
 p_filesz = p_memsz = 0x0EB0
 ```
 
-## Device result
+## Device-result correction
 
-User testing reported no visible regressions in EXP3A.
+Initial testing reported no visible regressions and was interpreted as including the winner glow.
 
-Observed result:
+A later deliberate recheck showed that the spinning winner/earned-round halo was already on the wrong orb in EXP3A.
 
-- Practice/Gold text behavior appears correct;
-- no visible battle-HUD regression;
-- no visible winner-orb/glow regression;
-- no visible startup/loading regression.
+Therefore:
 
-This validates the one-dynamic-hook Practice/Gold architecture well enough to proceed to a pure compaction candidate.
+- Practice/Gold one-hook behavior remains device-validated;
+- startup/loading remains good;
+- general battle HUD remains good;
+- EXP3A does **not** establish a correct winner-glow baseline.
 
-## Validated architecture
+## Validated font architecture
 
 Dynamic mode-font game hooks:
 
@@ -39,24 +39,23 @@ before: 0x08970A90 + 0x08970B24
 after:  0x08970A90 only
 ```
 
-The late site is a static instruction patch:
+Late site:
 
 ```text
 0x08970B24 -> lw a0,0x28(sp)
 ```
 
-The early hook prepares a bounded stack scratch for the slow path and preserves stock behavior on the fast path.
+The bounded stack scratch is cleared by stock code and persistent s6 text state is not mutated.
 
-Persistent `s6` text state is not mutated.
+This architecture may continue to be used for optimization work after the halo investigation is separated from it.
 
-## Next step
+## Winner-glow rule
 
-OPT-EXP3B may now compact the proven architecture without changing semantics:
+Do not use EXP3A or any descendant as evidence that the halo is fixed unless a dedicated round-win test explicitly verifies:
 
-- move the 52-byte helper into the proven 52-byte table-tail cave;
-- retarget only the three internal branches that call that helper;
-- zero the old 64-byte helper region;
-- zero the already-proven unreachable 24-byte old winner-glow X block;
-- keep all other accepted code unchanged.
+- P1 first win;
+- P2 first win;
+- later earned slots where practical;
+- spinning halo center relative to the newly lit orb.
 
 No GitHub Actions are used.
