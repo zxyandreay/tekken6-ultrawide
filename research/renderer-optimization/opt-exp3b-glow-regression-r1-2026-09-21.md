@@ -1,88 +1,43 @@
-# OPT-EXP3B winner-glow regression and R1 isolate — 2026-09-21
+# OPT-EXP3B halo observation — corrected interpretation — 2026-09-21
 
-## Device result
+## Corrected interpretation
 
-OPT-EXP3B is rejected as an accepted checkpoint.
+OPT-EXP3B displayed the spinning winner/earned-round halo on the wrong orb.
 
-Observed:
+Initially this was attributed to EXP3B compaction because EXP3A had been believed to have correct halo behavior.
 
-- font optimization/compaction otherwise works;
-- HP and other HUD behavior appear correct;
-- winner/earned-round spinning glow is again on the wrong orb.
+That premise was later disproven.
 
-This narrows the regression to the two compaction actions that did not exist in accepted EXP3A:
+The user retested:
 
-1. relocating the OneHookScratch helper into 0x0AC4..0x0AF7;
-2. physically zeroing 0x0D40..0x0D57 in the winner-glow hook tail.
+- OPT-EXP2S3;
+- OPT-EXP3A;
 
-## Important correction to the audit methodology
+and confirmed that both already show the same wrong-orb halo.
 
-The static audit previously proved there were no *direct* entries into
-0x0D40..0x0D57 through:
+Therefore there is **no evidence that EXP3B introduced the halo defect**.
 
-- PC-relative branches;
-- direct J/JAL instructions;
-- raw embedded pointers;
-- relocation records.
+The earlier R1 causal split between:
 
-That is insufficient to prove a MIPS block is dynamically unreachable.
+1. helper relocation;
+2. zeroing 0x0D40..0x0D57;
 
-It does not rule out:
+is invalid as a diagnosis of the halo bug because the baseline was already failing.
 
-- indirect JR/JALR control flow;
-- computed return-address entry;
-- runtime/self-patched entry;
-- other execution paths not represented as a direct static xref.
+## What remains useful from the EXP3B investigation
 
-Because device behavior regressed only after this block was physically cleared,
-the region must no longer be considered safely reclaimable without a dynamic
-execution proof.
+The direct-xref audit is still useful for space analysis, but winner-glow correctness must not be inferred from it.
 
-## EXP3B-R1 design
+The glow subsystem is now treated as an independent unresolved renderer issue.
 
-EXP3B-R1 is a strict A/B isolate.
+The current investigation compares:
 
-It keeps the EXP3B helper relocation and 64-byte compaction intact.
+- historical RoundWin v7, whose dedicated test note claimed a device-proven fixed-20:9 glow;
+- released v1.2.0 / OPT descendants, which use a rewritten dynamic glow transform;
+- an exaggerated current-hook diagnostic to prove whether the visible residual spin is actually owned by the current converter hook.
 
-It restores only:
+## Optimization rule
 
-```text
-0x0D40 .. 0x0D57
-```
-
-byte-for-byte from device-accepted EXP3A.
-
-Therefore:
-
-- if R1 fixes the halo, the restored winner-glow sub-block is causal;
-- if R1 still fails, the helper relocation/table-tail execution placement is causal.
-
-No other renderer logic changes.
-
-## Space accounting during R1
-
-Do not count the restored glow block as free.
-
-The only candidate hard-free region carried forward is:
-
-```text
-0x0C00 .. 0x0C3F = 64 bytes
-```
-
-This is still unaccepted until R1 passes device testing.
-
-## Permanent rule proposed if R1 passes
-
-Do not reclaim any interior block of a live hand-integrated render hook based
-only on direct-xref analysis.
-
-For future optimization, require either:
-
-- dynamic execution tracing proving the candidate block is never entered across
-  the relevant runtime states; or
-- relocation of an entire independently callable helper whose callers are fully
-  enumerated and device-tested.
-
-This rule is specifically intended to prevent another winner-glow regression.
+Do not perform additional winner-glow code reclamation or compaction until the renderer owner is re-proven dynamically.
 
 No GitHub Actions are used.
