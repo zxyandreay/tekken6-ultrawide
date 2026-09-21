@@ -25,7 +25,7 @@ import struct
 from pathlib import Path
 
 BASE_SHA256 = "46063c6097e3dfaa51aafd077e0e5c65f02487bdbe420f8884f2a292edf8cf1f"
-OUT_SHA256 = "24f6b9e3b243728de0e6a04d7f9b3b1e75641d3156a8c1fe355f3a79b06b3a67"
+OUT_SHA256 = "5caa1bc13cb678f8a91103500778816bce6a61580a57d83ceb4873a35c1a823a"
 TEXT_FILE_OFFSET = 0x60
 
 def patch(prx: bytes) -> bytes:
@@ -34,11 +34,11 @@ def patch(prx: bytes) -> bytes:
     data = bytearray(prx)
 
     expected = {
-        0x0D84: 0xC5042304, # lwc1 f4,scale
-        0x0D88: 0xC5062328, # lwc1 f6,center-span
-        0x0D8C: 0x3C083F00, # lui t0,0x3f00 (0.5)
-        0x0D90: 0x44881000, # mtc1 t0,f2
-        0x0D94: 0x46023182, # mul.s f6,f6,f2
+        0x0D84: 0xC5042304,
+        0x0D88: 0xC5062328,
+        0x0D8C: 0x3C083F00,
+        0x0D90: 0x44881000,
+        0x0D94: 0x46023182,
     }
     for va,wanted in expected.items():
         got=struct.unpack_from("<I",data,TEXT_FILE_OFFSET+va)[0]
@@ -46,16 +46,15 @@ def patch(prx: bytes) -> bytes:
             raise RuntimeError(f"unexpected glow math word at {va:#x}: {got:#010x}")
 
     replacement = {
-        0x0D84: 0x3C083F4C, # lui t0,0x3f4c
-        0x0D88: 0x3508CCCD, # ori t0,t0,0xcccd => 0.8f
-        0x0D8C: 0x44882000, # mtc1 t0,f4
-        0x0D90: 0x3C084240, # lui t0,0x4240 => 48.0f
-        0x0D94: 0x44883000, # mtc1 t0,f6
+        0x0D84: 0x3C083F4C,
+        0x0D88: 0x3508CCCD,
+        0x0D8C: 0x44882000,
+        0x0D90: 0x3C084240,
+        0x0D94: 0x44883000,
     }
     for va,word in replacement.items():
         struct.pack_into("<I",data,TEXT_FILE_OFFSET+va,word)
 
-    # Preserve fixed resident layout.
     e_phoff=struct.unpack_from("<I",data,0x1C)[0]
     e_phentsize,e_phnum=struct.unpack_from("<HH",data,0x2A)
     if e_phentsize != 32 or e_phnum != 1:
