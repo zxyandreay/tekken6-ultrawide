@@ -1,57 +1,45 @@
-# Research documentation
+# Research
 
-Technical notes for the Tekken 6 PPSSPP ultrawide plugin.
+This directory contains the **engineering evidence and experiment history** behind the plugin.
 
-The files are organized around the engineering process: initial state, hypothesis, test, observation, conclusion, and implementation.
+For the current accepted architecture, start with [`docs/`](../docs/). Use `research/` when you need to understand how a conclusion was established, inspect rejected approaches, or continue unresolved work.
 
-## v1.1.0 — automatic 3D aspect correction
+## Topics
 
-See `v1.1.0-auto-aspect-abi.md` for the runtime aspect-query work that replaced the fixed 3D CWCheat with automatic PPSSPP aspect detection.
+### [Auto aspect](auto-aspect/)
 
-## v1.2.0 — HUD correction / AutoHUD
+**Status:** COMPLETE / HISTORICAL FOUNDATION
 
-See `v1.2.0-autohud.md` for the end-to-end HUD-correction research.
+Runtime PPSSPP aspect-query work that replaced fixed manual aspect-ratio selection.
 
-The work starts from a known-good 3D-only 20:9 patch with stretched HUD/UI and no identified HUD transform, then follows the projection, screen-space, compositor, sprite, text, and packet paths that led to AutoHUD.
+### [AutoHUD](autohud/)
 
-### Detailed notes
+**Status:** ACCEPTED
 
-See `v1.2.0/README.md` for:
+Fight-HUD ownership, HP, timer, round markers, side labels, mode text, and the development path that produced the dynamic HUD architecture.
 
-- projection, screen-space, and native-2D experiments;
-- battle-HUD ownership mapping;
-- HP shell/fill research;
-- winner-orb and glow work;
-- timer ABI findings;
-- character-name anchoring;
-- Practice/Gold Rush glyph research;
-- test-build records;
-- HP AutoHUD packet tracing;
-- probe methodology.
+### [Renderer optimization](renderer-optimization/)
 
-## v1.2.1 — renderer maintenance and optimization
+**Status:** COMPLETE / ACCEPTED THROUGH v1.2.1
 
-See `renderer-optimization/README.md` for the maintenance line that followed v1.2.0.
+Post-v1.2.0 renderer consolidation, winner-glow correction, slot/font optimization, and the accepted EXP4A layout.
 
-That research records:
+## Folder convention
 
-- downstream HP consolidation;
-- slot-table and slot-scope wrapper compaction;
-- Practice/Gold one-hook text architecture;
-- winner-glow UV predicate root cause;
-- the historical first-win-only validation gap;
-- first and later winner-glow slot correction;
-- accepted EXP4A checkpoint and 136-byte detached hard-free audit;
-- deterministic builders and PPSSPP probes used during the work.
+Each topic uses:
 
-The exact device-validated EXP4A PRX is the authoritative v1.2.1 runtime binary.
+```text
+README.md       -> current status / reading order
+findings/       -> accepted technical conclusions
+archive/        -> superseded, rejected, chronological, or historical evidence
+```
 
-## Research method
+Historical files are preserved even when their conclusions were later disproved.
 
-Record only what is established by static analysis, a controlled test, a runtime capture, or a validated build. Mark an unrecorded result as `Result: not recorded` rather than inferring it.
+## Research tools
 
-## Implementation status
+Executable probes, builders, and audits live under:
 
-The exact device-validated release PRX remains authoritative.
+[`tools/research/`](../tools/research/)
 
-A future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, compact resident footprint, replacement-texture compatibility, mode-specific HUD behavior, winner-glow slot coverage, fast-forward behavior, and PPSSPP stability before being considered equivalent.
+This keeps the research tree primarily readable Markdown rather than mixing documentation and utilities.

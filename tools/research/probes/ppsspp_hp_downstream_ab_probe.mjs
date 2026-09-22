@@ -1134,7 +1134,7 @@ function parseArguments(argv) {
 
 function printUsage() {
   console.log('Usage:');
-  console.log('  node research/tools/ppsspp_hp_downstream_ab_probe.mjs <PHONE_IP:PORT> --mode <stock|v120> [--label NAME] [--max-hits 8..64]');
+  console.log('  node tools/research/probes/ppsspp_hp_downstream_ab_probe.mjs <PHONE_IP:PORT> --mode <stock|v120> [--label NAME] [--max-hits 8..64]');
   console.log('');
   console.log('This v2 probe performs one short discovery capture per process. It captures raw D56C/D5B0 traffic without assigning HUD-family labels.');
 }

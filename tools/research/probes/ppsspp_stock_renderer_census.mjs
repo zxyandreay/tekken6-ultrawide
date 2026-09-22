@@ -461,8 +461,8 @@ class CensusRunner {
 async function main() {
   const endpoint = process.argv[2];
   if (!endpoint || endpoint.startsWith('--')) {
-    console.error('Usage: node research/tools/ppsspp_stock_renderer_census.mjs <PHONE_IP:PORT>');
-    console.error('Example: node research/tools/ppsspp_stock_renderer_census.mjs 192.168.0.101:43091');
+    console.error('Usage: node tools/research/probes/ppsspp_stock_renderer_census.mjs <PHONE_IP:PORT>');
+    console.error('Example: node tools/research/probes/ppsspp_stock_renderer_census.mjs 192.168.0.101:43091');
     process.exit(2);
   }
 

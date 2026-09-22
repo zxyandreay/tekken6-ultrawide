@@ -91,13 +91,9 @@ If you maintain custom cheats, merge the included camera entries into your exist
 
 Downloads, version-specific changes, validation notes, and release history are kept in the [GitHub Releases](https://github.com/zxyandreay/tekken6-ultrawide/releases) section.
 
-## Research
+## Documentation and research
 
-This repository also documents the reverse-engineering process behind the plugin.
+- [Documentation](docs/) — current architecture, constraints, and development rules.
+- [Research](research/) — findings, experiment history, and reverse-engineering evidence.
 
-- [Research overview](research/)
-- [Automatic aspect-ratio research](research/v1.1.0-auto-aspect-abi.md)
-- [AutoHUD research](research/v1.2.0-autohud.md)
-- [Renderer optimization and maintenance research](research/renderer-optimization/)
-
-The research includes renderer ownership mapping, runtime probes, HUD geometry findings, experimental builds, accepted checkpoints, and reusable debugging tools.
+Version-specific user-facing changes remain in [GitHub Releases](https://github.com/zxyandreay/tekken6-ultrawide/releases).
