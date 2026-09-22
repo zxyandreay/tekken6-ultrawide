@@ -17,5 +17,4 @@ with zipfile.ZipFile(args.output, "w", zipfile.ZIP_DEFLATED) as z:
     z.write(args.prx, f"{PLUGIN_PREFIX}/Tekken6Ultrawide.prx")
     z.write(root / "plugin/config/plugin.ini", f"{PLUGIN_PREFIX}/plugin.ini")
     z.write(root / "ULUS10466.ini", CHEAT_PATH)
-    z.write(root / "README-PLUGIN.md", "README-PLUGIN.md")
 print(args.output)
