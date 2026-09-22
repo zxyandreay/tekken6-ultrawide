@@ -87,13 +87,3 @@ The implementation is designed to adapt to the current display aspect ratio. Dev
 
 If you maintain custom cheats, merge the included camera entries into your existing `ULUS10466.ini` instead of overwriting unrelated entries.
 
-## Releases
-
-Downloads, version-specific changes, validation notes, and release history are kept in the [GitHub Releases](https://github.com/zxyandreay/tekken6-ultrawide/releases) section.
-
-## Documentation and research
-
-- [Documentation](docs/) — current architecture, constraints, and development rules.
-- [Research](research/) — findings, experiment history, and reverse-engineering evidence.
-
-Version-specific user-facing changes remain in [GitHub Releases](https://github.com/zxyandreay/tekken6-ultrawide/releases).
