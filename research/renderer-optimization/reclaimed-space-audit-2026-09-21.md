@@ -1,243 +1,134 @@
-# v1.2.0 -> OPT-EXP2S3 internal space audit — 2026-09-21
+# Accepted internal-space audit — OPT-EXP3D-A — 2026-09-22
 
-## Purpose
-
-Measure reusable capacity in the accepted optimization line relative to official v1.2.0 without overstating what is actually free.
-
-This audit deliberately excludes all capacity estimates from rejected runtime-consolidation experiments.
-
-Artifacts:
+## Authoritative baseline
 
 ```text
-official v1.2.0
-SHA-256 311720e8aa115865343df4fcd13fa5e9f8f074ff1e05348ab165e9c6ef81ee75
+OPT-EXP3D-A — GlowFullSlotRange
+SHA-256:
+d8afe941dc3198107a460511d78fa2d8acde6f709020a7b351605e6a6fdfe17f
 
-accepted OPT-EXP2S3
-SHA-256 7496824d8b6827ecb39589d37f966cf638cf9232058f6f8dc2a2f1db355a3805
-```
-
-Both remain:
-
-```text
 file size = 5626 bytes
 one PT_LOAD
 p_filesz = p_memsz = 0x0EB0
 ```
 
-The resident allocation has not shrunk.
-
-## Confidence classes
-
-Do not use one number for all "free" bytes.
-
-The accepted image currently has three different classes:
-
-1. hard-free detached bytes;
-2. statically unreachable code that can be reclaimed only by an explicit repack;
-3. inline startup instruction slots that are not a generic code cave.
-
-Only class 1 should be described without qualification as free space.
-
-## Category A — proven hard-free contiguous capacity
-
-### Compressed slot-table tail
-
-OPT-EXP2S2/S3 stores thirteen slot records at 8 bytes each.
-
-The active table is:
+Resident allocation reduction remains:
 
 ```text
-0x0A5C .. 0x0AC3
-13 * 8 = 104 bytes
+0 bytes
 ```
 
-All three table walkers use the same end pointer and stride:
+The fixed 0x0EB0 mapping remains part of correctness.
+
+## Hard-free general-purpose capacity
+
+### Old Practice/Gold helper allocation
+
+EXP3A validated the one-hook stack-scratch architecture.
+
+EXP3B relocated its 52-byte live helper into the previously proven 52-byte slot-table tail.
+
+The old helper allocation was then detached and zeroed:
 
 ```text
-end = 0x0A5C + 0x68 = 0x0AC4
-validation stride     = +8
-installation stride   = +8
-cache-flush stride    = +8
+0x0C00 .. 0x0C3F
+64 bytes
 ```
 
-The former tail is:
+This relocation remained intact through EXP3C and device-accepted EXP3D-A.
+
+Therefore the accepted general-purpose hard-free capacity is:
+
+```text
+64 bytes
+```
+
+## Regions that are NOT free
+
+### Former compressed-table tail
 
 ```text
 0x0AC4 .. 0x0AF7
 ```
 
-and is all zero in the accepted binary.
+This was previously 52 bytes of hard-free space.
 
-Capacity:
+It now contains the live one-hook Practice/Gold helper.
 
-```text
-0x34 = 52 bytes
-```
-
-Proof:
-
-- the active table end is exactly 0x0AC4;
-- every table walker terminates at that same end;
-- no walker can advance into the tail;
-- the bytes are zero-filled;
-- the region is inside the existing executable PT_LOAD.
-
-This is the only region currently classified as unquestioned general-purpose hard-free capacity.
-
-## Category B — verified unreachable code, not yet physically reclaimed
-
-### Old winner-glow first-slot X classifier
-
-OPT-EXP2S3 changed:
+Current free capacity:
 
 ```text
-0x0D3C -> unconditional branch to 0x0D58
+0 bytes
 ```
 
-The skipped range is:
+### Winner-glow classifier
+
+The earlier audit treated part of:
 
 ```text
 0x0D40 .. 0x0D57
-= 24 bytes
 ```
 
-Before calling this block reusable, the accepted binary was checked for alternate entry paths.
+as a possible reclaim candidate.
 
-Checks performed:
+That classification is permanently withdrawn.
 
-- scan of all PC-relative branch targets in the full 0x0EB0 load;
-- scan of all direct J/JAL targets under the module's 0x08800000 execution region;
-- scan for embedded absolute/module-relative pointers into 0x0D40..0x0D57;
-- inspection of the winner-glow hook control flow;
-- inspection of the PRX relocation records.
+EXP3C/EXP3D established that this region participates in the accepted winner-glow ownership logic.
 
-Result:
+Current free capacity:
 
 ```text
-no alternate branch target
-no direct J/JAL target
-no embedded pointer target
-no relocation entry that creates an alternate entry
+0 bytes
 ```
 
-The only normal flow reaches 0x0D3C and jumps over the block to 0x0D58.
+Do not optimize this region independently.
 
-The accepted device test also validates that this bypass is the active winner-glow path.
-
-Therefore the 24-byte block is statically unreachable in OPT-EXP2S3.
-
-However:
-
-- most of the bytes still contain old instructions;
-- they have not yet been zeroed or repacked in an accepted build.
-
-Classification:
+### Startup HP installer NOPs
 
 ```text
-24 bytes verified unreachable / reclaimable by repack
-NOT counted as hard-free until a build actually reclaims them
-```
-
-This distinction is intentional.
-
-## Category C — startup-only inline instruction slots
-
-OPT-EXP1 removed installation of the two upstream HP gauge hooks.
-
-The initializer contains:
-
-```text
-0x03F0 = NOP
-0x03F4 = NOP
-```
-
-Capacity:
-
-```text
+0x03F0 .. 0x03F7
 8 bytes
 ```
 
-These words are still inside straight-line startup execution.
-
-They are not a detached code cave.
-
-They may only be reused by a startup repack that preserves surrounding control flow.
+These remain inside straight-line startup execution.
 
 Classification:
 
 ```text
-8 bytes startup-only inline opportunity
-NOT general free space
+startup-only inline opportunity
+NOT general hard-free space
 ```
 
-## What is NOT free
-
-### Former upstream HP wrapper
-
-The old upstream HP wrapper was reused as the accepted downstream HP handler.
-
-Net hard-free bytes from that region:
+## Accepted budget
 
 ```text
-0
+general-purpose hard-free: 64 bytes
+startup-inline opportunity:  8 bytes
+resident allocation saved:   0 bytes
 ```
 
-The improvement is architectural, not a space reduction.
+Do not combine 64+8 into one generic free-space number.
 
-### Rejected slot-consolidation estimates
+## Historical numbers that must not be reused
 
-The 216-byte and 236-byte estimates belonged to OPT-EXP2 / EXP2R / EXP2R2.
+Do not cite as current accepted free space:
 
-Those architectures failed device testing.
+- 52-byte old table-tail cave — now occupied by live font helper;
+- 24-byte old glow block — now live/frozen;
+- 76/84-byte EXP2S3 accounting — obsolete after later accepted repacking;
+- 216/236-byte EXP2/EXP2R estimates — rejected architecture.
 
-Accepted capacity from those estimates:
+## Rule for further optimization
+
+Future work may use the 64-byte hard-free block if needed, but an optimization that merely consumes it without reclaiming more elsewhere is not a space optimization.
+
+Prefer changes that simplify runtime topology or create a larger detached region while keeping:
 
 ```text
-0
+one PT_LOAD
+p_filesz = p_memsz = 0x0EB0
 ```
 
-Do not cite those numbers as reclaimed space.
+Winner-glow code is frozen and excluded from optimization targets.
 
-## Authoritative current budget
-
-### Unquestioned hard-free capacity
-
-```text
-compressed table tail   52 bytes
-```
-
-### Additional verified reclaim candidates
-
-```text
-unreachable glow block  24 bytes
-startup-only NOP slots   8 bytes
-```
-
-Therefore:
-
-```text
-52 bytes = already hard-free general capacity
-
-24 bytes = statically proven unreachable, available only after explicit repack
- 8 bytes = startup-only inline opportunity
-```
-
-A future compact build could potentially expose more, but it must be measured after device validation.
-
-Do not describe the current accepted build as having "84 bytes of free space."
-
-## OPT-EXP3A policy
-
-OPT-EXP3A deliberately does not consume any of these three audited regions.
-
-It leaves unchanged:
-
-```text
-0x0AC4 .. 0x0AF7   52-byte hard-free table tail
-0x0D40 .. 0x0D57   24-byte unreachable glow block
-0x03F0 .. 0x03F7   startup-only NOP slots
-```
-
-The first EXP3 experiment changes only the existing Practice/Gold font implementation and repurposes the already-dedicated late helper region.
-
-This keeps the space audit independent from the behavioral proof of the one-hook font architecture.
+No GitHub Actions are used.
