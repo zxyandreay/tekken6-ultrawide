@@ -62,36 +62,35 @@ jobs:
         run: |
           cat > /tmp/release-notes.md <<'EOF'
           # Tekken 6 Ultrawide v1.2.1
-
-          v1.2.1 is a maintenance release for **Tekken 6 USA (`ULUS10466`)** on PPSSPP.
-
+          
+          v1.2.1 is a maintenance update for **Tekken 6 USA (`ULUS10466`)** on PPSSPP, focused on stability and a round-win visual fix.
+          
           ## Highlights
-
-          - Fixes the animated winner/earned-round glow so the spinning effect follows the newly earned orb for both P1 and P2.
-          - Fixes later-win glow slots in addition to the first win.
-          - Preserves the automatic 3D + AutoHUD correction introduced in v1.2.0.
-          - Preserves HP bars, player-side HUD, timer, round markers, character labels, Practice HUD text, and Gold Rush labels.
-          - Preserves custom replacement textures/fonts.
-          - Preserves PPSSPP fast-forward behavior.
-          - Includes the optional `Original`, `Slightly Wider`, `Wider`, and `Widest` camera presets.
-
+          
+          - Fixes the animated round-win glow so it follows the correct newly earned round marker for both players, including later wins.
+          - Includes internal cleanup and optimization aimed at improving stability while keeping existing behavior unchanged.
+          - No setup changes are required for users upgrading from v1.2.0.
+          
           ## Installation
-
+          
           Extract **`Tekken6-Ultrawide-v1.2.1.zip`** into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder. Keep **Stretch** enabled under PPSSPP's display layout settings.
-
+          
           If you already have custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up first and merge the included camera entries manually.
-
+          
           Do not enable legacy v1.0.0 manual aspect-ratio CWCheats together with the plugin.
-
+          
           ## Compatibility
-
+          
           This release targets **Tekken 6 USA (`ULUS10466`)** on PPSSPP with PRX plugin support in landscape orientation. Other regional versions are not supported.
-
-          ## Validation
-
-          The accepted v1.2.1 binary was tested across Arcade, Story, Ghost Battle, Practice, and Gold Rush. The maintenance sweep explicitly verified P1/P2 first and later winner-glow slots, visible spinner animation, custom replacement textures/fonts, and fast-forward.
-
-          The correction remains aspect-derived. The release was validated on an approximately 20:9 target display; other display ratios were not independently device-tested for this release.
+          
+          ## Tested modes
+          
+          v1.2.1 was tested in **Arcade, Story, Ghost Battle, Practice, and Gold Rush**, including repeated round wins, custom replacement textures/fonts, and fast-forward.
+          
+          ## Scope
+          
+          v1.2.1 is a maintenance and stability update. AutoHUD coverage remains the same as v1.2.0, so some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.
+          
           EOF
 
       - name: Publish GitHub release

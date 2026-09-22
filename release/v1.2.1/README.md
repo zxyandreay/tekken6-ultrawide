@@ -1,5 +1,7 @@
 # v1.2.1 release provenance
 
+The public release notes are intentionally kept user-facing; this file retains the technical provenance for the published artifact.
+
 The v1.2.1 GitHub release is published from an exact device-validated archive stored as base64 in this directory.
 
 The PRX is the exact accepted **OPT-EXP4A SlotScopeCompact** binary. It is promoted directly rather than rebuilt from the readable research source.
