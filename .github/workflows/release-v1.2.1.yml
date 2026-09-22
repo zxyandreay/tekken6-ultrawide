@@ -1,0 +1,111 @@
+name: Publish v1.2.1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'release/v1.2.1/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v1.2.1
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: v1.2.1
+      ASSET: Tekken6-Ultrawide-v1.2.1.zip
+      ZIP_SHA256: e40644a9622ad0e2665aea85b3c05b8580a9a7f75fe485995ee801062af0b020
+      PRX_SHA256: 6a537691e758dabc912910b9cfb1758e9ea9b5a2554242a43ff87e281c32a8e8
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Restore and verify exact validated release archive
+        run: |
+          base64 --decode release/v1.2.1/Tekken6-Ultrawide-v1.2.1.zip.b64 > "$ASSET"
+          echo "$ZIP_SHA256  $ASSET" | sha256sum --check --strict
+
+          ACTUAL_PRX_SHA256="$(unzip -p "$ASSET" PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx | sha256sum | awk '{print $1}')"
+          test "$ACTUAL_PRX_SHA256" = "$PRX_SHA256"
+
+          cat > /tmp/expected-files.txt <<'EOF'
+          PSP/Cheats/ULUS10466.ini
+          PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx
+          PSP/PLUGINS/Tekken6Ultrawide/plugin.ini
+          README-PLUGIN.md
+          EOF
+
+          unzip -Z1 "$ASSET" | sort > /tmp/actual-files.txt
+          sort /tmp/expected-files.txt -o /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/actual-files.txt
+
+          if unzip -Z1 "$ASSET" | grep -Eiq '(EXP[0-9]+|DynamicHP|research/)'; then
+            echo "Experimental/research filename found in public archive."
+            exit 1
+          fi
+
+          sha256sum "$ASSET" > "$ASSET.sha256"
+          unzip -l "$ASSET"
+
+      - name: Write release notes
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          # Tekken 6 Ultrawide v1.2.1
+
+          v1.2.1 is a maintenance release for **Tekken 6 USA (`ULUS10466`)** on PPSSPP.
+
+          ## Highlights
+
+          - Fixes the animated winner/earned-round glow so the spinning effect follows the newly earned orb for both P1 and P2.
+          - Fixes later-win glow slots in addition to the first win.
+          - Preserves the automatic 3D + AutoHUD correction introduced in v1.2.0.
+          - Preserves HP bars, player-side HUD, timer, round markers, character labels, Practice HUD text, and Gold Rush labels.
+          - Preserves custom replacement textures/fonts.
+          - Preserves PPSSPP fast-forward behavior.
+          - Includes the optional `Original`, `Slightly Wider`, `Wider`, and `Widest` camera presets.
+
+          ## Installation
+
+          Extract **`Tekken6-Ultrawide-v1.2.1.zip`** into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder. Keep **Stretch** enabled under PPSSPP's display layout settings.
+
+          If you already have custom entries in `PSP/Cheats/ULUS10466.ini`, back that file up first and merge the included camera entries manually.
+
+          Do not enable legacy v1.0.0 manual aspect-ratio CWCheats together with the plugin.
+
+          ## Compatibility
+
+          This release targets **Tekken 6 USA (`ULUS10466`)** on PPSSPP with PRX plugin support in landscape orientation. Other regional versions are not supported.
+
+          ## Validation
+
+          The accepted v1.2.1 binary was tested across Arcade, Story, Ghost Battle, Practice, and Gold Rush. The maintenance sweep explicitly verified P1/P2 first and later winner-glow slots, visible spinner animation, custom replacement textures/fonts, and fast-forward.
+
+          The correction remains aspect-derived. The release was validated on an approximately 20:9 target display; other display ratios were not independently device-tested for this release.
+          EOF
+
+      - name: Publish GitHub release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+            gh release edit "$TAG" \
+              --title "Tekken 6 Ultrawide v1.2.1" \
+              --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" \
+              "$ASSET" \
+              "$ASSET.sha256" \
+              --target main \
+              --title "Tekken 6 Ultrawide v1.2.1" \
+              --notes-file /tmp/release-notes.md
+          fi

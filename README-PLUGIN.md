@@ -1,15 +1,17 @@
-# Tekken 6 Ultrawide v1.2.0
+# Tekken 6 Ultrawide v1.2.1
 
-v1.2.0 adds automatic battle-HUD correction on top of the automatic 3D aspect-ratio correction introduced in v1.1.0 for **Tekken 6 USA (`ULUS10466`)** on PPSSPP.
+v1.2.1 is a maintenance release for **Tekken 6 USA (`ULUS10466`)** on PPSSPP. It preserves the automatic 3D + AutoHUD correction introduced in v1.2.0 while fixing the animated winner/earned-round glow across first and later wins.
 
-## What v1.2.0 does
+## What v1.2.1 does
 
 - Automatically reads PPSSPP's current landscape display aspect ratio.
 - Corrects Tekken 6's 3D projection without requiring a manual aspect-ratio cheat.
-- Dynamically corrects the persistent fight HUD so it keeps its intended proportions and anchoring on widescreen displays.
-- Preserves both HP fills, player-side HUD, timer, round indicators, winner effects, character labels, Practice HUD text, and Gold Rush battle labels.
-- Keeps optional camera framing as normal CWCheat presets in PPSSPP's Cheats menu.
-- Requires no plugin configuration editing.
+- Dynamically corrects the persistent fight HUD with aspect-derived horizontal scaling and semantic anchoring.
+- Corrects HP shells/fills, player-side HUD, rank badges, timer, round markers, character names, Practice HUD text, and Gold Rush labels.
+- Fixes the **spinning winner/earned-round glow** so it follows the newly earned orb for both P1 and P2 on first and later wins.
+- Preserves custom replacement textures/fonts tested during development.
+- Preserves PPSSPP fast-forward behavior.
+- Keeps optional camera framing as normal CWCheat presets.
 
 The package intentionally contains **no manual aspect-ratio CWCheats**, avoiding conflicts with the automatic plugin.
 
@@ -44,7 +46,7 @@ The included `PSP/Cheats/ULUS10466.ini` contains optional camera presets. Enable
 - `Camera - Wider`
 - `Camera - Widest`
 
-The automatic aspect/HUD plugin works independently of the camera preset.
+Automatic 3D/HUD correction works independently of the camera preset.
 
 ## Compatibility
 
@@ -57,6 +59,8 @@ Other regional releases are not currently supported.
 
 ## Validation and limitations
 
-The v1.2.0 PRX was validated on-device across Arcade, Story, Ghost Battle, Practice, and Gold Rush, including HP fill, mode-specific battle text, and replacement-texture/font behavior. The HUD coefficients are derived from PPSSPP's reported aspect at runtime rather than selected from a fixed list. The validated target device used an approximately 20:9 presentation; other aspect ratios were not independently device-tested during this release cycle.
+The v1.2.1 PRX was validated on-device across the existing v1.2.0 gameplay/HUD coverage. Validation also explicitly covered P1/P2 first and later winner-glow slots, visible spinner animation, custom replacement textures/fonts, and fast-forward.
 
-v1.2.0 focuses on the persistent fight HUD. Some menu, character-select, pause, or transient pre/post-battle UI may still retain the game's original layout behavior.
+The HUD coefficients are derived from PPSSPP's reported aspect at runtime rather than selected from a fixed list. The validated target device used an approximately 20:9 presentation; other aspect ratios were not independently device-tested during this release cycle.
+
+The plugin focuses on gameplay HUD correction. Some menu, character-select, pause, or transient pre/post-battle UI may retain the game's original layout behavior.

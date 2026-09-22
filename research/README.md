@@ -29,12 +29,29 @@ See `v1.2.0/README.md` for:
 - HP AutoHUD packet tracing;
 - probe methodology.
 
+## v1.2.1 — renderer maintenance and optimization
+
+See `renderer-optimization/README.md` for the maintenance line that followed v1.2.0.
+
+That research records:
+
+- downstream HP consolidation;
+- slot-table and slot-scope wrapper compaction;
+- Practice/Gold one-hook text architecture;
+- winner-glow UV predicate root cause;
+- the historical first-win-only validation gap;
+- first and later winner-glow slot correction;
+- accepted EXP4A checkpoint and 136-byte detached hard-free audit;
+- deterministic builders and PPSSPP probes used during the work.
+
+The exact device-validated EXP4A PRX is the authoritative v1.2.1 runtime binary.
+
 ## Research method
 
 Record only what is established by static analysis, a controlled test, a runtime capture, or a validated build. Mark an unrecorded result as `Result: not recorded` rather than inferring it.
 
 ## Implementation status
 
-The exact device-validated v1.2.0 PRX is authoritative for the release.
+The exact device-validated release PRX remains authoritative.
 
-A future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, compact resident footprint, replacement-texture compatibility, mode-specific HUD behavior, and PPSSPP stability before being considered equivalent.
+A future source-derived replacement should reproduce the documented hook semantics, dynamic aspect behavior, compact resident footprint, replacement-texture compatibility, mode-specific HUD behavior, winner-glow slot coverage, fast-forward behavior, and PPSSPP stability before being considered equivalent.
