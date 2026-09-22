@@ -1,43 +1,43 @@
 # Tekken 6 PPSSPP Ultrawide
 
-Automatic **3D + gameplay HUD aspect-ratio correction** for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP**, with optional gameplay camera presets in PPSSPP's normal Cheat menu.
+Automatic **3D + gameplay HUD aspect-ratio correction** for **Tekken 6 USA (`ULUS10466`)** on **PPSSPP**, with optional gameplay camera presets.
 
 ![Tekken 6 PPSSPP ultrawide 20:9 aspect ratio with Widest camera preview](assets/tekken6-aspect-camera-preview.png)
 
-> **Screenshot settings:** 20:9 display + `Camera - Widest`
+> **Screenshot:** 20:9 display + `Camera - Widest`
 
-## v1.2.1
+## About
 
-v1.2.1 is a maintenance release for the AutoHUD implementation introduced in v1.2.0.
+Tekken 6 was designed around a 16:9 presentation. On wider displays, simply stretching the image can distort the 3D view and gameplay HUD.
 
-It fixes the animated winner/earned-round glow so the spinning effect follows the newly earned orb for **both P1 and P2 on first and later wins**, while preserving the existing automatic 3D/HUD correction, fast-forward, and replacement-texture/font compatibility.
+This plugin reads PPSSPP's current landscape display aspect ratio at runtime and applies automatic correction to the game's 3D projection and supported gameplay HUD paths.
 
-### AutoHUD coverage
+The HUD correction is **aspect-derived**, not hard-coded to a specific display ratio.
 
-v1.2.1 corrects:
+## Features
 
-- HP shells and both colored HP fill layers
-- player-side strips and rank badges
-- character-name anchoring
-- round timer
-- persistent and newly earned round markers
-- animated winner/earned-round glow across first and later wins
-- Practice infinite timer and combo/damage text
-- Gold Rush `REWARD` and `ATTACK VARIATION` labels
-- mode-specific fight HUD used by Arcade, Story, Ghost Battle, Practice, and Gold Rush
-- custom replacement textures/fonts
-
-Camera framing remains optional and separate through CWCheat presets.
+- Automatic 3D aspect-ratio correction
+- Automatic gameplay HUD correction
+- Corrected HP bars and fills
+- Player-side HUD and rank badge anchoring
+- Character-name anchoring
+- Round timer and round markers
+- Animated winner/earned-round effects
+- Practice mode HUD text
+- Gold Rush battle labels
+- Support for tested custom replacement textures/fonts
+- Optional gameplay camera presets through PPSSPP's Cheat menu
+- No manual aspect-ratio cheat selection required
 
 ## Installation
 
-1. Open the [latest release](https://github.com/zxyandreay/tekken6-ultrawide/releases/latest) and download **`Tekken6-Ultrawide-v1.2.1.zip`**.
-2. Back up `PSP/Cheats/ULUS10466.ini` first if it contains unrelated custom cheats you want to keep.
-3. Extract the ZIP into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder.
-4. Enable **Tekken 6 Ultrawide** in PPSSPP's plugin manager if it is not enabled automatically.
-5. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch**.
-6. Cold-boot **Tekken 6 USA (`ULUS10466`)**.
-7. Do not enable legacy v1.0.0 manual aspect-ratio CWCheats at the same time as the plugin.
+1. Open the [latest release](https://github.com/zxyandreay/tekken6-ultrawide/releases/latest).
+2. Download the release ZIP.
+3. Back up `PSP/Cheats/ULUS10466.ini` first if it contains unrelated custom cheats.
+4. Extract the ZIP into the PPSSPP memory-stick root so the included `PSP` folder merges with your existing `PSP` folder.
+5. Enable **Tekken 6 Ultrawide** in PPSSPP's plugin manager if needed.
+6. Go to **Settings → Graphics → Display layout & effects** and enable **Stretch**.
+7. Cold-boot **Tekken 6 USA (`ULUS10466`)**.
 
 The plugin is installed at:
 
@@ -45,71 +45,59 @@ The plugin is installed at:
 PSP/PLUGINS/Tekken6Ultrawide/Tekken6Ultrawide.prx
 ```
 
-## Camera options
+Do not use legacy manual aspect-ratio CWCheats at the same time as the automatic plugin.
 
-The included `PSP/Cheats/ULUS10466.ini` contains camera presets only. Enable at most one:
+## Camera presets
 
-| Cheat entry | Effect |
+The included `PSP/Cheats/ULUS10466.ini` contains optional camera presets:
+
+| Preset | Effect |
 | --- | --- |
 | `Camera - Original (Default)` | Stock gameplay camera |
-| `Camera - Slightly Wider` | Small increase in visible play area |
+| `Camera - Slightly Wider` | Slightly wider gameplay framing |
 | `Camera - Wider` | Wider gameplay framing |
-| `Camera - Widest` | Maximum included camera preset |
+| `Camera - Widest` | Widest included gameplay framing |
 
-Camera cheats are optional. Automatic aspect/HUD correction works independently of them.
+Enable at most one camera preset.
 
-## How automatic correction works
+Camera selection is separate from automatic 3D/HUD aspect correction.
 
-Tekken 6's stock presentation is based on a 16:9 logical frame. The plugin asks PPSSPP for the current landscape display aspect and derives the correction at runtime rather than selecting from a fixed list of phone or monitor ratios.
+## How it works
 
-The 3D projection is patched to PPSSPP's reported display aspect. For HUD paths that need correction, AutoHUD applies aspect-derived horizontal scaling and left/center/right anchoring while preserving vertical geometry and mode-specific behavior.
+The plugin queries PPSSPP for the current landscape display aspect ratio and derives the required correction at runtime.
 
-## Validation
-
-v1.2.1 was tested on-device across the existing v1.2.0 gameplay coverage:
-
-- Arcade
-- Story
-- Ghost Battle
-- Practice
-- Gold Rush
-
-The maintenance validation additionally confirmed:
-
-- P1 first and later winner-glow slots
-- P2 first and later winner-glow slots
-- visible spinner animation on the newly lit orb
-- HP shell/fill and persistent round markers
-- character names, ranks, side strips, and timer
-- Practice and Gold Rush font/HUD corrections
-- custom replacement textures/fonts
-- fast-forward
-
-The implementation is aspect-derived rather than fixed to 20:9. Testing was performed on an approximately 20:9 display; other display ratios have not yet been independently tested.
+The 3D projection is adjusted to the reported display aspect. Supported HUD elements use aspect-derived horizontal scaling and semantic left/center/right anchoring while preserving their intended vertical geometry and game behavior.
 
 ## Compatibility
 
 - **Game:** Tekken 6 USA
 - **Game ID:** `ULUS10466`
 - **Emulator:** PPSSPP with PRX plugin support
-- **Orientation:** landscape
+- **Orientation:** Landscape
 
 Other regional versions are not currently supported.
 
-## Limitations
+## Scope and limitations
 
-- The plugin focuses on gameplay HUD correction. Some menu, character-select, pause, or transient pre/post-battle UI may retain the game's original layout behavior.
-- The package's `ULUS10466.ini` contains camera presets only. Merge it manually if you maintain other custom cheats.
-- Other display ratios have not yet been independently tested.
+The project focuses primarily on the gameplay presentation and battle HUD.
 
-## Previous releases
+Some menu, character-select, pause, or transient pre/post-battle UI may retain the game's original layout behavior.
 
-- **v1.2.0:** introduced AutoHUD correction for the persistent fight HUD.
-- **v1.1.0:** automatic 3D aspect correction; original 2D HUD remained uncorrected.
-- **v1.0.0:** manual aspect-ratio CWCheats plus camera presets.
+The implementation is designed to adapt to the current display aspect ratio. Development and device validation have primarily been performed on an approximately 20:9 display, so other ratios may need additional real-device validation.
 
-## Technical notes
+If you maintain custom cheats, merge the included camera entries into your existing `ULUS10466.ini` instead of overwriting unrelated entries.
 
-The AutoHUD reverse-engineering process is documented in [`research/v1.2.0-autohud.md`](research/v1.2.0-autohud.md).
+## Releases
 
-The v1.2.1 maintenance/optimization work, including the winner-glow root-cause analysis and accepted renderer checkpoints, is documented in [`research/renderer-optimization/`](research/renderer-optimization/).
+Downloads, version-specific changes, validation notes, and release history are kept in the [GitHub Releases](https://github.com/zxyandreay/tekken6-ultrawide/releases) section.
+
+## Research
+
+This repository also documents the reverse-engineering process behind the plugin.
+
+- [Research overview](research/)
+- [Automatic aspect-ratio research](research/v1.1.0-auto-aspect-abi.md)
+- [AutoHUD research](research/v1.2.0-autohud.md)
+- [Renderer optimization and maintenance research](research/renderer-optimization/)
+
+The research includes renderer ownership mapping, runtime probes, HUD geometry findings, experimental builds, accepted checkpoints, and reusable debugging tools.
