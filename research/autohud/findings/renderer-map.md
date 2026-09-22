@@ -128,7 +128,7 @@ The large round countdown has two dedicated calls to the original timer renderer
 0x08929B44
 ```
 
-The timer-specific wrapper temporarily enters the existing centered rectangle scope while each digit is submitted. The original renderer consumes a fifth stack argument; the wrapper must forward it before making the call. See [`center-timer.md`](center-timer.md).
+The timer-specific wrapper temporarily enters the existing centered rectangle scope while each digit is submitted. The original renderer consumes a fifth stack argument; the wrapper must forward it before making the call. See [`center-timer.md`](timer.md).
 
 ## HP shell geometry
 
@@ -273,7 +273,7 @@ x' = 0.8*x + 48
 width' = 0.8*width
 ```
 
-An early integrated wrapper failed to forward the timer renderer's fifth stack argument and caused the countdown to disappear. The corrected ABI-preserving wrapper was validated on-device in multiple battle modes. The timer is solved and frozen. See [`center-timer.md`](center-timer.md).
+An early integrated wrapper failed to forward the timer renderer's fifth stack argument and caused the countdown to disappear. The corrected ABI-preserving wrapper was validated on-device in multiple battle modes. The timer is solved and frozen. See [`center-timer.md`](timer.md).
 
 ## Character-name rectangles
 
@@ -304,7 +304,7 @@ X > 240 -> RIGHT
 
 On-device validation confirmed correct outward anchoring for P1/P2 character names without regressing the timer, HP, ranks, side effects, round markers, winner orb, winner glow, PPSSPP replacement textures, or fast-forward input.
 
-Two intermediate binary artifacts (`v9` / `v9.1`) carried an unintended enlarged PRX LOAD segment from a temporary trampoline experiment and produced unrelated emulator-side regressions. A clean v9.2 rebuilt from the known-good v8.1 module layout kept the name fix while restoring those behaviors. This is recorded in detail in [`side-labels.md`](side-labels.md).
+Two intermediate binary artifacts (`v9` / `v9.1`) carried an unintended enlarged PRX LOAD segment from a temporary trampoline experiment and produced unrelated emulator-side regressions. A clean v9.2 rebuilt from the known-good v8.1 module layout kept the name fix while restoring those behaviors. This is recorded in detail in [`side-labels.md`](side-hud.md).
 
 The character-name rectangle family is solved and frozen.
 

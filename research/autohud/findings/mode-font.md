@@ -15,9 +15,9 @@ EXP6 integrated PRX                ACCEPTED / DEVICE VALIDATED
 PT_LOAD p_memsz                     0x0EB0
 ```
 
-Checkpoint hashes, architecture, and regression policy: [`checkpoint-exp6.md`](checkpoint-exp6.md).
+Checkpoint hashes, architecture, and regression policy: [`checkpoint-exp6.md`](../archive/exp6-checkpoint.md).
 
-The simplified EXP5 fallback is recorded in [`test-builds.md`](test-builds.md).
+The simplified EXP5 fallback is recorded in [`test-builds.md`](../archive/test-builds.md).
 
 The normal Arcade/Story/Ghost battle-HUD fixes remain frozen unless a regression is demonstrated.
 
