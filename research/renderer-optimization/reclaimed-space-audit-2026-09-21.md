@@ -1,96 +1,84 @@
-# Accepted internal-space audit — OPT-EXP3D-A — 2026-09-22
+# Accepted internal-space audit — OPT-EXP4A — 2026-09-22
 
 ## Authoritative baseline
 
 ```text
-OPT-EXP3D-A — GlowFullSlotRange
+OPT-EXP4A — SlotScopeCompact
 SHA-256:
-d8afe941dc3198107a460511d78fa2d8acde6f709020a7b351605e6a6fdfe17f
+6a537691e758dabc912910b9cfb1758e9ea9b5a2554242a43ff87e281c32a8e8
 
 file size = 5626 bytes
 one PT_LOAD
 p_filesz = p_memsz = 0x0EB0
 ```
 
-Resident allocation reduction remains:
+Resident allocation reduction:
 
 ```text
 0 bytes
 ```
 
-The fixed 0x0EB0 mapping remains part of correctness.
+The fixed one-LOAD 0x0EB0 mapping remains part of runtime correctness.
 
-## Hard-free general-purpose capacity
+## Accepted general-purpose hard-free capacity
 
-### Old Practice/Gold helper allocation
+### Region A — compacted slot-wrapper tail
 
-EXP3A validated the one-hook stack-scratch architecture.
+OPT-EXP4A reduced the live slot-scope wrapper and left:
 
-EXP3B relocated its 52-byte live helper into the previously proven 52-byte slot-table tail.
+```text
+0x0604 .. 0x0647
+72 bytes
+```
 
-The old helper allocation was then detached and zeroed:
+fully detached and zero.
+
+Device validation passed the complete HUD/font/texture/fast-forward regression sweep.
+
+Classification:
+
+```text
+72 bytes accepted general-purpose hard-free
+```
+
+### Region B — old Practice/Gold helper allocation
+
+The live one-hook helper remains relocated to the former table tail.
+
+Its old allocation remains:
 
 ```text
 0x0C00 .. 0x0C3F
 64 bytes
 ```
 
-This relocation remained intact through EXP3C and device-accepted EXP3D-A.
+detached and zero.
 
-Therefore the accepted general-purpose hard-free capacity is:
-
-```text
-64 bytes
-```
-
-## Regions that are NOT free
-
-### Former compressed-table tail
+Classification:
 
 ```text
-0x0AC4 .. 0x0AF7
+64 bytes accepted general-purpose hard-free
 ```
 
-This was previously 52 bytes of hard-free space.
-
-It now contains the live one-hook Practice/Gold helper.
-
-Current free capacity:
+## Authoritative hard-free total
 
 ```text
-0 bytes
+0x0604..0x0647   72 bytes
+0x0C00..0x0C3F   64 bytes
+-------------------------
+accepted total   136 bytes
 ```
 
-### Winner-glow classifier
+## Startup-inline opportunity
 
-The earlier audit treated part of:
-
-```text
-0x0D40 .. 0x0D57
-```
-
-as a possible reclaim candidate.
-
-That classification is permanently withdrawn.
-
-EXP3C/EXP3D established that this region participates in the accepted winner-glow ownership logic.
-
-Current free capacity:
-
-```text
-0 bytes
-```
-
-Do not optimize this region independently.
-
-### Startup HP installer NOPs
+The removed upstream HP installer still leaves:
 
 ```text
 0x03F0 .. 0x03F7
 8 bytes
 ```
 
-These remain inside straight-line startup execution.
+inside straight-line startup execution.
 
 Classification:
 
@@ -99,36 +87,51 @@ startup-only inline opportunity
 NOT general hard-free space
 ```
 
-## Accepted budget
+Do not add these 8 bytes to the 136-byte general free-space figure.
+
+## Regions that are live and must not be counted
+
+### Former compressed-table tail
 
 ```text
-general-purpose hard-free: 64 bytes
-startup-inline opportunity:  8 bytes
-resident allocation saved:   0 bytes
+0x0AC4 .. 0x0AF7
 ```
 
-Do not combine 64+8 into one generic free-space number.
+Contains the live Practice/Gold one-hook helper.
 
-## Historical numbers that must not be reused
-
-Do not cite as current accepted free space:
-
-- 52-byte old table-tail cave — now occupied by live font helper;
-- 24-byte old glow block — now live/frozen;
-- 76/84-byte EXP2S3 accounting — obsolete after later accepted repacking;
-- 216/236-byte EXP2/EXP2R estimates — rejected architecture.
-
-## Rule for further optimization
-
-Future work may use the 64-byte hard-free block if needed, but an optimization that merely consumes it without reclaiming more elsewhere is not a space optimization.
-
-Prefer changes that simplify runtime topology or create a larger detached region while keeping:
+Free capacity:
 
 ```text
-one PT_LOAD
-p_filesz = p_memsz = 0x0EB0
+0 bytes
 ```
 
-Winner-glow code is frozen and excluded from optimization targets.
+### Winner-glow classifier
+
+The winner-glow ownership/predicate area is live and frozen after EXP3C/EXP3D-A.
+
+Free capacity:
+
+```text
+0 bytes
+```
+
+Do not reclaim or repack it as part of unrelated work.
+
+## Historical numbers that are obsolete
+
+Do not cite as current accepted hard-free capacity:
+
+- 52-byte pre-EXP3B table-tail cave;
+- 24-byte proposed glow block;
+- 76/84-byte EXP2S3 opportunity totals;
+- 216/236-byte rejected runtime-consolidation estimates.
+
+## Release implication
+
+136 bytes of device-validated detached capacity is sufficient headroom for a maintenance release.
+
+There is no current functional need to continue optimizing before release.
+
+Further optimization should be driven by a concrete future requirement rather than by maximizing the free-byte count.
 
 No GitHub Actions are used.
