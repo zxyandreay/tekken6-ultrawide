@@ -1,133 +1,76 @@
-# OPT-EXP4A plan — compact slot-scope wrapper — 2026-09-22
+# OPT-EXP4A — compact slot-scope wrapper — accepted checkpoint — 2026-09-22
 
-## Base
+## Status
 
-Device-accepted:
+Accepted on device.
+
+Artifact:
 
 ```text
-OPT-EXP3D-A — GlowFullSlotRange
+Tekken6Ultrawide-OPT-EXP4A-SlotScopeCompact.prx
+
 SHA-256:
-d8afe941dc3198107a460511d78fa2d8acde6f709020a7b351605e6a6fdfe17f
+6a537691e758dabc912910b9cfb1758e9ea9b5a2554242a43ff87e281c32a8e8
+
+file size = 5626 bytes
+one PT_LOAD
+p_filesz = p_memsz = 0x0EB0
 ```
 
-Winner-glow code is frozen and excluded from this experiment.
+This supersedes OPT-EXP3D-A as the working optimization baseline while preserving the exact accepted winner-glow implementation from EXP3D-A.
 
-## Target
+## Device validation
 
-Current slot-scope wrapper:
+The complete regression sweep passed with no observed breakage.
+
+Confirmed working:
+
+- cold boot/startup;
+- gameplay HUD corrections;
+- HP shell and colored fill;
+- ranks and side strips;
+- character-name anchoring;
+- round timer;
+- persistent round markers;
+- P1 first-win spinning winner glow;
+- P1 later-win spinning winner glow;
+- P2 first-win spinning winner glow;
+- P2 later-win spinning winner glow;
+- Practice HUD/font correction;
+- Gold Rush HUD/font correction;
+- custom replacement textures/fonts;
+- fast-forward.
+
+No winner-glow code was modified by EXP4A.
+
+## Optimization performed
+
+Accepted pre-EXP4A slot-scope wrapper:
 
 ```text
 0x05A0 .. 0x0647
 168 bytes
 ```
 
-All 13 game callsites remain exactly as accepted.
+The original wrapper preserved a0-a3, t0-t3 and f12 even though it did not modify those values before calling stock `0x0892D9F8`.
 
-The wrapper's purpose is:
-
-1. if original a1 == 0xEF, increment module scope counter;
-2. call stock 0x0892D9F8;
-3. if original a1 == 0xEF, decrement scope counter;
-4. return exactly as the original callsite expects.
-
-## Redundancy in the accepted wrapper
-
-The current wrapper saves and restores:
-
-```text
-a0 a1 a2 a3
-t0 t1 t2 t3
-f12
-```
-
-before the stock call.
-
-But the wrapper itself modifies none of those values.
-
-Before the stock call it uses only t4/t5 for the scope counter.
-
-Therefore the save/restore block is unnecessary for preserving the original
-0x0892D9F8 input state.
-
-The only values that must survive across the stock call are:
+The compact wrapper preserves only state that actually needs to survive across the stock call:
 
 - incoming ra;
-- original a1, for the post-call scope decision;
-- the scope-counter pointer on the matched path.
+- original a1 for scope close-out;
+- scope-counter pointer on the 0xEF path.
 
-## Boundary-state equivalence
+It preserves the accepted wrapper's stock-call and wrapper-return boundary behavior, including t4/t5 values.
 
-### Non-0xEF path
+## Relocation cleanup
 
-At stock 0x0892D9F8 entry:
+The removed wrapper contained two module-local HI16/LO16 address-materialization pairs.
 
-```text
-a0-a3 unchanged
-t0-t3 unchanged
-f12 unchanged
-t4 = 0xEF
-t5 unchanged
-```
+The compact wrapper derives the scope-counter pointer through a local BAL-relative value.
 
-This matches the accepted wrapper.
+The four obsolete relocation records are disabled as R_MIPS_NONE.
 
-At wrapper return after the stock call:
-
-```text
-t4 = original a1
-t5 = 0xEF
-v0 = stock return value
-ra/sp restored
-```
-
-This also matches the accepted wrapper.
-
-### 0xEF path
-
-At stock entry:
-
-```text
-t4 = module+0x0C44
-t5 = incremented scope value
-```
-
-matching the accepted wrapper.
-
-At wrapper return:
-
-```text
-t4 = module+0x0C44
-t5 = decremented scope value
-v0 = stock return value
-ra/sp restored
-```
-
-again matching the accepted wrapper.
-
-## Relocation handling
-
-The old wrapper has two module-local HI16/LO16 pairs:
-
-```text
-0x05D8 / 0x05DC
-0x0628 / 0x062C
-```
-
-The compact wrapper derives the counter pointer once through a BAL-relative local
-PC value and stores that pointer on its stack.
-
-The four old relocation records are therefore changed to R_MIPS_NONE.
-
-No new relocation is required.
-
-## Candidate size
-
-Compact wrapper:
-
-```text
-0x05A0 .. 0x0603
-96 bytes
-```
+## Accepted hard-free result
 
 New detached zero tail:
 
@@ -136,50 +79,43 @@ New detached zero tail:
 72 bytes
 ```
 
-Existing accepted hard-free block:
+Existing accepted detached zero block:
 
 ```text
 0x0C00 .. 0x0C3F
 64 bytes
 ```
 
-If device validation passes:
+Accepted general-purpose hard-free capacity:
 
 ```text
 72 + 64 = 136 bytes
 ```
 
-of general detached hard-free capacity.
+This is now device-validated capacity.
 
-This is a candidate count until device validation.
+## Frozen subsystems
 
-## What does NOT change
+Winner-glow remains frozen exactly as accepted in EXP3D-A.
 
-- 13 slot callsites;
-- J versus JAL semantics at those callsites;
-- stock slot builder 0x0892D9F8;
-- scope counter location;
-- rectangle compositor;
-- HP path;
-- timer;
-- Practice/Gold helper;
-- character names;
-- round-marker rectangle path;
-- frozen EXP3D-A winner-glow path;
-- PT_LOAD size/layout.
+Do not alter for unrelated optimization:
 
-## Test priority
+```text
+0x08AC9C38 winner-glow callsite
+0x08AE94A4 original converter
+corrected packed 64x64 UV identity
+winner-row Y gate
+full P1/P2 round-family X gate
+dynamic AutoHUD CENTER transform
+source-X save/transform/restore sequence
+```
 
-1. cold boot / title / menus;
-2. Arcade battle;
-3. P1 and P2 first + later earned wins, including spinning halo;
-4. HP full/partial/low;
-5. ranks / side strips / names;
-6. timer;
-7. Practice;
-8. Gold Rush;
-9. Ghost / Story;
-10. replacement textures/fonts;
-11. fast-forward.
+## Recommendation after acceptance
+
+EXP4A is a suitable release baseline.
+
+Further optimization is no longer required for the next maintenance release.
+
+Any additional optimizer experiment should branch from this exact hash and should not delay a release unless it fixes a demonstrated user-visible problem.
 
 No GitHub Actions are used.
